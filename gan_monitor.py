@@ -1,8 +1,8 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import backend as K # type: ignore
+from keras import backend as K
 
-from layers import WeightedSum
+from model_utils.layers import WeightedSum
 from utils import (prepare_fake_images,
                    calculate_fid,
                    plot_images

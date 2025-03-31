@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import backend as K # type: ignore
+from keras import backend as K
 
 class MinibatchStdev(tf.keras.layers.Layer):
     def __init__(self, **kwargs):

@@ -2,8 +2,8 @@ import keras
 import tensorflow as tf
 tf.test.gpu_device_name()
 
-from layers import WeightedSum
-from builders import DiscriminatorBuilder, GeneratorBuilder
+from model_utils.layers import WeightedSum
+from model_utils.builders import DiscriminatorBuilder, GeneratorBuilder
 
 class PGAN(keras.Model):
     def __init__(self, configuration:dict, regressor:keras.Model):
