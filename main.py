@@ -1,3 +1,4 @@
+import keras
 import numpy as np
 from tensorflow.keras.applications.inception_v3 import InceptionV3 # type: ignore
 
@@ -17,6 +18,7 @@ print(f"Data Shape: {meta_data.shape}")
 fid_model = InceptionV3(include_top=False, pooling='avg', input_shape=(299,299,3))
 mu1, sigma1 = prepare_real_images(fid_model=fid_model, meta_data=meta_data, target_size=CONFIG['END_SIZE'])
 
+trained_R = keras.models.load_model("regressor_results/best_regressor_0.15.keras")
 pgan = PGAN(configuration=CONFIG, regressor=trained_R)
 cbk  = GANMonitor(
     num_img=len(meta_data), latent_dim=CONFIG['LATENT_DIM'],

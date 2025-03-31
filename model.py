@@ -1,12 +1,12 @@
+import keras
 import tensorflow as tf
-from tensorflow.keras.models import Model # type: ignore
 tf.test.gpu_device_name()
 
 from layers import WeightedSum
 from builders import DiscriminatorBuilder, GeneratorBuilder
 
-class PGAN(Model):
-    def __init__(self, configuration:dict, regressor:Model):
+class PGAN(keras.Model):
+    def __init__(self, configuration:dict, regressor:keras.Model):
         super(PGAN, self).__init__()
         self.gen_builder  = GeneratorBuilder(configuration)
         self.disc_builder = DiscriminatorBuilder(configuration)
@@ -132,7 +132,7 @@ class PGAN(Model):
                         
             gen = self.generator([random_latent_vectors, real_mass], training=True)
             predictions = self.discriminator(gen, training = False)
-            predictions_mass = self.regressor(gen, training = False)
+            predictions_mass = self.regressor.predict(gen)
             
             # Total generator loss
             mass_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, predictions_mass)

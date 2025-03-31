@@ -69,7 +69,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
             print('Shuffling the data..')
             self.meta_data = self.meta_data.sample(frac=1).reset_index(drop=True)
     
-    def __get_input(self, img_id, mass, target_size):
+    def __get_input(self, img_id, target_size):
 
         file_name = self.data_dir + img_id + '.npy'
 
@@ -78,7 +78,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
 
         img = dynamic_range_opt(img, mult_factor=2.5)
         
-        return img, mass
+        return img
     
     def __get_output(self, label):
         return label
@@ -89,7 +89,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
         X_col_batch = batches[self.X_col]
         y_col_batch = batches[self.y_col]
 
-        X_batch = np.asarray([self.__get_input(x, y, self.target_size) for x, y in zip(X_col_batch, y_col_batch)])
+        X_batch = np.asarray([self.__get_input(x, self.target_size) for x in X_col_batch])
         y_batch = np.asarray([self.__get_output(y) for y in y_col_batch])
         
         return X_batch, y_batch
@@ -103,4 +103,3 @@ class CustomDataGen(tf.keras.utils.Sequence):
     
     def __len__(self):
         return int(np.ceil(self.n / self.batch_size))
-    

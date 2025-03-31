@@ -1,0 +1,9 @@
+# pycache
+__pycache__
+
+# Results folders
+regressor_results/
+results*
+
+# Mainframe
+mainframe.csv
