@@ -3,9 +3,10 @@ import tensorflow as tf
 from keras import backend as K
 
 from model_utils.layers import WeightedSum
-from utils import (prepare_fake_images,
-                   calculate_fid,
-                   plot_images
+from generic_utils import (
+    prepare_fake_images,
+    calculate_fid,
+    plot_images
 )
 
 # Saves generated images and updates alpha in WeightedSum layers
@@ -16,23 +17,26 @@ class GANMonitor(tf.keras.callbacks.Callback):
             num_img:int,
             latent_dim:int,
             image_path:str,
+            plot_every:int,
             checkpoint_dir:str,
             fid_model,
             fid_real_par:tuple[float, float],
             prefix:str = ''
             ):
 
-        self.prefix  = prefix
-        self.image_path = image_path; self.checkpoint_dir = checkpoint_dir
+        # Prefix for correct saving path
+        self.prefix  = prefix;   self.image_path = image_path;   self.checkpoint_dir = checkpoint_dir
+        
+        # Latent vectors initialization
+        self.plot_every = plot_every
         self.random_latent_vectors = tf.random.normal(shape=[num_img, latent_dim])
         self.mass = tf.convert_to_tensor(np.round(tf.random.uniform(
-                        shape=[num_img, 1], minval=14,maxval=14.95),2))
+                        shape=[num_img, 1], minval=14,maxval=15),2))
         
-        self.fid_scores = []
-        self.fid_model = fid_model
-        self.mu1, self.cov1 = fid_real_par
+        # FID score tracking
+        self.fid_scores = [];   self.fid_model = fid_model;   self.mu1, self.cov1 = fid_real_par
 
-    def set_prefix(self, prefix=''):
+    def set_prefix(self, prefix:str):
         self.prefix = prefix
         
     def set_steps(self, steps_per_epoch, epochs):
@@ -40,12 +44,12 @@ class GANMonitor(tf.keras.callbacks.Callback):
         self.epochs = epochs
         self.steps = self.steps_per_epoch * self.epochs
 
-    def on_epoch_begin(self, epoch):
+    def on_epoch_begin(self, epoch, logs=None):
         self.n_epoch = epoch
         checkpoint_path = f"{self.checkpoint_dir}/pgan_{self.n_epoch:04d}.weights.h5"
         self.checkpoint_path = checkpoint_path
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, logs=None):
         self.n_epoch = epoch
 
         try:
@@ -56,7 +60,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
             return
 
         # Plot
-        if epoch % 20 == 0:
+        if epoch % self.plot_every == 0:
             save_path = f'{self.image_path}/plot_{self.prefix}_{epoch:03d}.png'
             plot_images(self.model.generator([self.random_latent_vectors, self.mass]), save_path=save_path)
 
@@ -71,7 +75,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
             self.model.save_weights(self.checkpoint_path)
             print(f"[GANMonitor] Weights saved at {self.checkpoint_path}")
             
-    def on_batch_begin(self, batch):
+    def on_batch_begin(self, batch, logs=None):
         
         # Update alpha in WeightedSum layers
         # alpha usually goes from 0 to 1 evenly over ALL the epochs for that depth.

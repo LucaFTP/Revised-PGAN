@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from utils import dynamic_range_opt
+from generic_utils import dynamic_range_opt
 
 def create_folders(version:str):
     
@@ -37,7 +37,6 @@ def get_unique(data):
     for col in data.columns[1:]:
         print(f'\n"{col}" has {len(data[col].unique())} unique values: {data[col].unique()}')
 
-
 def load_meta_data(redshift, show=False):
     meta_data = pd.read_csv("mainframe.csv")
     meta_data=meta_data[meta_data['redshift']<=redshift]
@@ -53,20 +52,30 @@ def load_meta_data(redshift, show=False):
         
 class CustomDataGen(tf.keras.utils.Sequence):
     
-    def __init__(self, meta_data, X_col, y_col, batch_size, target_size, shuffle=True):
+    def __init__(
+            self,
+            meta_data: pd.DataFrame,
+            batch_size: int,
+            target_size: int,
+            X_col: str = 'id',
+            y_col: str = 'mass',
+            shuffle=True,
+            **kwargs
+            ):
+        super().__init__()
         
-        self.meta_data = meta_data.copy()
-        self.X_col = X_col
-        self.y_col = y_col
-        self.batch_size = batch_size
-        self.target_size = target_size
-        self.shuffle = shuffle
-        self.n = len(self.meta_data)
+        self.meta_data = meta_data.copy();  self.n = len(self.meta_data);   self.shuffle = shuffle
+        
+        self.X_col = X_col;     self.batch_size = batch_size
+        self.y_col = y_col;     self.target_size = target_size
+        
+        self.eps = kwargs.get('epsilon', 1e-6); self.mult_factor = kwargs.get('mult_factor', 2.5)
+
         self.data_dir = "/leonardo_scratch/fast/INA24_C3B13/ALL_ROT_npy_version/1024x1024/"
 
     def on_epoch_end(self):
         if self.shuffle:
-            print('Shuffling the data..')
+            print('\n Shuffling the data..')
             self.meta_data = self.meta_data.sample(frac=1).reset_index(drop=True)
     
     def __get_input(self, img_id, target_size):
@@ -76,7 +85,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
         img = np.load(file_name).astype('float32')
         img = tf.image.resize(np.expand_dims(img, axis=-1), target_size).numpy()
 
-        img = dynamic_range_opt(img, mult_factor=2.5)
+        img = dynamic_range_opt(img, epsilon=self.eps, mult_factor=self.mult_factor)
         
         return img
     

@@ -36,6 +36,13 @@ def dynamic_range_opt(array, epsilon=1e-6, mult_factor=1):
     b = np.log10(1/epsilon)
     return a/b * mult_factor
 
+def inv_dynamic_range(synth_img, eps=1e-6, mult_factor=1):
+    synth_img = tf.image.resize(synth_img, (128, 128))
+    image = synth_img[:]/mult_factor
+    a = - eps**(1 - image)
+    b = eps**image - 1
+    return a*b
+
 # calculate frechet inception distance
 def calculate_fid(fid_model, mu1, sigma1, images2):
     images2 = preprocess_input(images2)

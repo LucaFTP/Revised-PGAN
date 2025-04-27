@@ -1,6 +1,5 @@
 import keras
 import numpy as np
-import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 from config import CONFIG
@@ -21,7 +20,7 @@ def RegressorConv(x, filters, kernel_size, pooling=None, activate=None, strides=
 def build_regressor(image_size: int, filters: list) -> keras.Model:
     input_shape = (image_size, image_size, 1)
     img_input = keras.layers.Input(shape=input_shape, name="reg_input")
-    x = keras.layers.Lambda(lambda x: tf.cast(x, tf.float32))(img_input)
+    x = img_input
     
     for depth in range(5):
         x = RegressorConv(x, filters[depth], kernel_size=1, pooling=None, activate='LeakyReLU', strides=(1,1))
