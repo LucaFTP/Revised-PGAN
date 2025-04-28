@@ -178,7 +178,6 @@ class PGAN(Model):
         merge = tf.keras.layers.Concatenate()([noise, mass]) #L x (3)
                 
         # Actual size(After doing reshape) is just FILTERS[0], so divide gain by 4
-        self.conv_counter = 0
  
         x = WeightScalingDense(merge, filters=self.min_resolution*self.min_resolution*self.filters[0], gain=np.sqrt(2)/4, activate='LeakyReLU', use_pixelnorm=False) 
         
@@ -186,13 +185,10 @@ class PGAN(Model):
 
         # x = WeightScalingConv(x, filters = FILTERS[0], kernel_size=(4,4), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=False)
         x = WeightScalingConv(x, filters = self.filters[0], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=False)
-        self.conv_counter += 1 
         x = WeightScalingConv(x, filters = self.filters[0], kernel_size=(2,2), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True)
-        self.conv_counter += 1
 
         # Gain should be 1 as its the last layer 
         x = WeightScalingConv(x, filters=1, kernel_size=(1,1), gain=1., activate='tanh', use_pixelnorm=False) # change to tanh and understand gain 1 if training unstable
-        self.conv_counter += 1 
         x = (x + 1)/2 # Limits the values between 0 and 1
         
         g_model = Model([noise,mass], x, name='generator')

@@ -18,7 +18,7 @@ class PGANTrainer:
         
         self.pgan = pgan;                   self.cbk = cbk
         self.meta_data = meta_data;         self.config = config
-        self.loss_out_path = loss_out_path; self.milestone = kwargs.get('milestone', 0)
+        self.loss_out_path = loss_out_path; self.verbose = kwargs.get('verbose', 1)
 
         self.start_size  = config['START_SIZE'];   self.end_size = config['END_SIZE']
         self.batch_sizes = config['BATCH_SIZE'];   self.epochs   = config['EPOCHS']
@@ -47,7 +47,7 @@ class PGANTrainer:
     def _fit_and_log(self, dataset, prefix, steps, epochs):
         self.cbk.set_prefix(prefix)
         self.cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
-        history = self.pgan.fit(dataset, epochs=epochs, callbacks=[self.cbk])
+        history = self.pgan.fit(dataset, epochs=epochs, callbacks=[self.cbk], verbose=self.verbose)
         np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
         return history
 
@@ -81,6 +81,7 @@ class PGANTrainer:
 
             self.pgan.fade_in_generator()
             self.pgan.fade_in_discriminator()
+            self.pgan.fade_in_regressor()
             self.init_optimizers()
 
             history_fade_in = self._fit_and_log(dataset, f'{n_depth}_fade_in', len(dataset), self.epochs)
@@ -88,6 +89,7 @@ class PGANTrainer:
             print(f"\n>> Stabilizing at size {current_size}x{current_size}")
             self.pgan.stabilize_generator()
             self.pgan.stabilize_discriminator()
+            self.pgan.stabilize_regressor()
             self.init_optimizers()
 
             history_stabilize = self._fit_and_log(dataset, f'{n_depth}_stabilize', len(dataset), self.epochs)

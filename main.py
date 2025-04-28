@@ -1,3 +1,4 @@
+import argparse
 import matplotlib
 from tensorflow.keras.applications.inception_v3 import InceptionV3 # type: ignore
 
@@ -7,6 +8,14 @@ from train import PGANTrainer
 from gan_monitor import GANMonitor
 from generic_utils import prepare_real_images
 from data_utils import load_meta_data, create_folders
+
+# Parser creation
+parser = argparse.ArgumentParser(
+    description="Options for the execution of the code."
+)
+parser.add_argument("-v", "--verbose", type=int, default=1, required=False,
+                    help="0 = silent, 1 = progress bar, 2 = one line per epoch.")
+args = parser.parse_args()
 
 REDSHIFT    = CONFIG.get('z_th')
 D_STEPS     = CONFIG.get('D_STEPS', 5)
@@ -39,7 +48,7 @@ pgan = PGAN(
     )
 
 cbk = GANMonitor(
-    num_img=len(meta_data),
+    num_img=350,
     latent_dim = NOISE_DIM,
     plot_every=25,
     fid_model=fid_model,
@@ -53,6 +62,7 @@ trainer = PGANTrainer(
     config=CONFIG,
     pgan=pgan,
     cbk=cbk,
-    loss_out_path=LOSS_OUTPUT_PATH
+    loss_out_path=LOSS_OUTPUT_PATH,
+    verbose=args.verbose
     )
 trainer.train()
