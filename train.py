@@ -77,7 +77,7 @@ class PGANTrainer:
         if initial_depth == max_depth:
             return self.pgan
 
-        for n_depth in range(initial_depth + 1, max_depth + 1):
+        for n_depth in range(initial_depth, max_depth):
             current_size = current_size * 2
             print(f"\n>> Fading in at size {current_size}x{current_size}")
             self.pgan.n_depth = n_depth
