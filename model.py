@@ -15,19 +15,15 @@ from model_utils.layers import(
 class PGAN(Model):
     def __init__(
             self,
-            latent_dim: int,
-            d_steps: int,
-            gp_weight: float,
-            drift_weight: float,
-            mass_loss_weight: float
+            pgan_config: dict
             ):
         super(PGAN, self).__init__()
         
-        self.latent_dim = latent_dim;   self.d_steps = d_steps
-        self.gp_weight = gp_weight;     self.drift_weight = drift_weight
-        self.min_resolution = 4;        self.mass_loss_weight = mass_loss_weight
-        
-        # Parameters
+        self.latent_dim = pgan_config.get('latent_dim');        self.d_steps = pgan_config.get('d_steps')
+        self.gp_weight  = pgan_config.get('gp_weight', 10);     self.drift_weight = pgan_config.get('drift_weight', 0.001)
+        self.min_resolution = pgan_config.get('min_res', 4);    self.mass_loss_weight = pgan_config.get('mass_loss_weight', 1)
+
+        # Filters
         self.filters = [512, 256, 128, 64, 32, 16, 8]
         self.regressor_filters = [50, 50, 50, 50, 20, 10, 10]
         self.regressor_filters_2 = [50, 50, 50, 20, 10, 10, 10]
@@ -64,7 +60,7 @@ class PGAN(Model):
     # Fade in upper resolution block
     def fade_in_discriminator(self):
 
-        input_shape = list(self.discriminator.input.shape) 
+        input_shape = list(self.discriminator.input.shape)
         # 1. Double the input resolution. 
         input_shape = (input_shape[1]*2, input_shape[2]*2, input_shape[3]) # 8 x 8 x 2
         img_input = tf.keras.layers.Input(shape = input_shape)
@@ -113,7 +109,6 @@ class PGAN(Model):
         #  [(I - F +2 *P) / S] +1 = 4 x 4 x 50
 
         x = RegressorConv(img_input, self.regressor_filters[0], kernel_size = 1, pooling=None, activate='LeakyReLU', strides=(1,1))
-        
         
         # print(x.shape) # 4 x 4 x 50
         x = RegressorConv(x, self.regressor_filters[0], kernel_size = 3, pooling='avg', activate='LeakyReLU', strides=(1,1)) 

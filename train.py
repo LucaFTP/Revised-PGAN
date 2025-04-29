@@ -20,8 +20,8 @@ class PGANTrainer:
         self.meta_data = meta_data;         self.config = config
         self.loss_out_path = loss_out_path; self.verbose = kwargs.get('verbose', 1)
 
-        self.start_size  = config['START_SIZE'];   self.end_size = config['END_SIZE']
-        self.batch_sizes = config['BATCH_SIZE'];   self.epochs   = config['EPOCHS']
+        self.start_size  = config['start_size'];   self.end_size = config['end_size']
+        self.batch_sizes = config['batch_size'];   self.epochs   = config['epochs']
 
         self.g_lr = config.get('G_LR', 1e-3);      self.beta_1 = config.get('BETA_1', 0.0)
         self.d_lr = config.get('D_LR', 1e-3);      self.beta_2 = config.get('BETA_2', 0.999)
@@ -54,6 +54,10 @@ class PGANTrainer:
     def train(self):
         max_depth = int(np.log2(self.end_size/2))
         initial_depth = int(np.log2(self.start_size/2))
+        current_size = self.start_size
+
+        if self.start_size == self.pgan.min_resolution:
+            self.pgan.n_depth = 0
 
         for n_depth in range(1, initial_depth):
             self.pgan.n_depth = n_depth
@@ -68,13 +72,13 @@ class PGANTrainer:
         print(f"Starting training at {self.start_size}x{self.start_size}")
         self.init_optimizers()
         dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
-        history_init = self._fit_and_log(dataset, f'{n_depth}_init', len(dataset), self.epochs)
+        history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs)
 
         if initial_depth == max_depth:
             return self.pgan
 
         for n_depth in range(initial_depth + 1, max_depth + 1):
-            current_size = self.start_size * 2
+            current_size = current_size * 2
             print(f"\n>> Fading in at size {current_size}x{current_size}")
             self.pgan.n_depth = n_depth
             dataset = self._make_dataset(current_size, self.batch_sizes[n_depth - initial_depth])

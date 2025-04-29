@@ -1,0 +1,19 @@
+{
+    "version": "_z_0.15_oneres_128",
+    "train_config": {
+        "z_th": 0.15,
+        "epsilon": 1e-6,
+        "mult_factor": 2.5,
+        "start_size": 4,
+        "end_size": 16,
+        "batch_size": [32, 32, 32],
+        "epochs": 5
+    },
+    "model_config": {
+        "d_steps": 5,
+        "latent_dim": 6,
+        "gp_weight": 10,
+        "drift_weight": 0.001,
+        "mass_loss_weight": 1
+    }
+}
