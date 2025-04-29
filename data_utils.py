@@ -7,7 +7,7 @@ from generic_utils import dynamic_range_opt
 
 def create_folders(version:str):
     
-    CKPT_OUTPUT_PATH = '/leonardo_scratch/fast/INA24_C3B13/GAN_ckpts' + version
+    CKPT_OUTPUT_PATH = '/leonardo_scratch/fast/uTS25_Fontana/GAN_ckpts' + version
     IMG_OUTPUT_PATH  = 'results' + version + '/Images'
     LOSS_OUTPUT_PATH = 'results' + version + '/Loss'
 
@@ -71,7 +71,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
         
         self.eps = kwargs.get('epsilon', 1e-6); self.mult_factor = kwargs.get('mult_factor', 2.5)
 
-        self.data_dir = "/leonardo_scratch/fast/INA24_C3B13/ALL_ROT_npy_version/1024x1024/"
+        self.data_dir = "/leonardo_scratch/fast/uTS25_Fontana/ALL_ROT_npy_version/1024x1024/"
 
     def on_epoch_end(self):
         if self.shuffle:
