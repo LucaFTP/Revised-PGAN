@@ -64,7 +64,7 @@ def calculate_fid(fid_model, mu1, sigma1, images2):
 
 def prepare_real_images(fid_model, meta_data, target_size:int):
     real_images = []
-    data_dir = "/leonardo_scratch/fast/INA24_C3B13/ALL_ROT_npy_version/1024x1024/"
+    data_dir = "/leonardo_scratch/fast/uTS25_Fontana/ALL_ROT_npy_version/1024x1024/"
 
     meta_data = meta_data[meta_data['rot'] == 0]
     ## Apply normalization and reshape into target_size x target_size images
