@@ -2,8 +2,8 @@ import keras
 import numpy as np
 
 from model import PGAN
-from gan_monitor import GANMonitor
 from data_utils import CustomDataGen
+from gan_monitor import GANMonitor, FadeInLRSchedule
 
 class PGANTrainer:
     def __init__(
@@ -25,17 +25,38 @@ class PGANTrainer:
 
         self.g_lr = config.get('G_LR', 1e-3);      self.beta_1 = config.get('BETA_1', 0.0)
         self.d_lr = config.get('D_LR', 1e-3);      self.beta_2 = config.get('BETA_2', 0.999)
-        self.r_lr = config.get('R_LR', 1e-3)
+        self.r_lr = config.get('R_LR', 1e-3);      self.fade_in_epochs = config.get('fade_in_epochs', 250)
 
         self.rescale_eps = config.get('EPS', 1e-6); self.mult_factor = config.get('MULT', 2.5)
     
-    def init_optimizers(self):
+    def init_optimizers(self, fade_in=False, steps=None):
+        if fade_in:
+            g_lr_schedule = FadeInLRSchedule(
+                initial_lr=self.g_lr,
+                min_lr=self.g_lr * 0.1,
+                fade_in_steps=self.fade_in_epochs * steps
+            )
+            d_lr_schedule = FadeInLRSchedule(
+                initial_lr=self.d_lr,
+                min_lr=self.d_lr * 0.1,
+                fade_in_steps=self.fade_in_epochs * steps
+            )
+            r_lr_schedule = FadeInLRSchedule(
+                initial_lr=self.r_lr,
+                min_lr=self.r_lr * 0.1,
+                fade_in_steps=self.fade_in_epochs * steps
+            )
+        else:
+            g_lr_schedule = self.g_lr
+            d_lr_schedule = self.d_lr
+            r_lr_schedule = self.r_lr
+
         self.g_optimizer = keras.optimizers.Adam(
-            learning_rate=self.g_lr, beta_1=self.beta_1, beta_2=self.beta_2, epsilon=1e-8)
+            learning_rate=g_lr_schedule, beta_1=self.beta_1, beta_2=self.beta_2, epsilon=1e-8)
         self.d_optimizer = keras.optimizers.Adam(
-            learning_rate=self.d_lr, beta_1=self.beta_1, beta_2=self.beta_2, epsilon=1e-8)
+            learning_rate=d_lr_schedule, beta_1=self.beta_1, beta_2=self.beta_2, epsilon=1e-8)
         self.r_optimizer = keras.optimizers.Adam(
-            learning_rate=self.r_lr, beta_1=self.beta_1, beta_2=self.beta_2, epsilon=1e-8)
+            learning_rate=r_lr_schedule, beta_1=self.beta_1, beta_2=self.beta_2, epsilon=1e-8)
         self.pgan.compile(d_optimizer=self.d_optimizer, g_optimizer=self.g_optimizer, r_optimizer=self.r_optimizer)
 
     def _make_dataset(self, size, batch_size):
@@ -86,9 +107,9 @@ class PGANTrainer:
             self.pgan.fade_in_generator()
             self.pgan.fade_in_discriminator()
             self.pgan.fade_in_regressor()
-            self.init_optimizers()
+            self.init_optimizers(fade_in=True, steps=len(dataset))
 
-            history_fade_in = self._fit_and_log(dataset, f'{n_depth}_fade_in', len(dataset), self.epochs)
+            history_fade_in = self._fit_and_log(dataset, f'{n_depth}_fade_in', len(dataset), self.fade_in_epochs)
 
             print(f"\n>> Stabilizing at size {current_size}x{current_size}")
             self.pgan.stabilize_generator()

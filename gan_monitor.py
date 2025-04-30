@@ -52,20 +52,21 @@ class GANMonitor(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.n_epoch = epoch
 
-        try:
-            prefix_number, prefix_state = self.prefix.split("_")
-            prefix_number = int(prefix_number)
-        except ValueError:
-            print(f"[GANMonitor] Unexpected prefix format: '{self.prefix}'. Skipping FID/weights saving.")
-            return
-
         # Plot
         if epoch % self.plot_every == 0:
             save_path = f'{self.image_path}/plot_{self.prefix}_{epoch:03d}.png'
             plot_images(self.model.generator([self.random_latent_vectors, self.mass]), save_path=save_path)
 
         # Save weights + FID
-        if prefix_number == 5 and prefix_state == 'final' and epoch % 10 == 0:
+        try:
+            prefix_number, prefix_state = self.prefix.split("_")
+            prefix_number = int(prefix_number)
+        except ValueError:
+            print(f"[GANMonitor] Unexpected prefix format: '{self.prefix}'. Skipping FID/weights saving.")
+            return
+        
+        # if prefix_number == 5 and prefix_state == 'final' and epoch % 10 == 0:
+        if epoch % 25 == 0:
             generated_imgs = self.model.generator([self.random_latent_vectors, self.mass])
             synthetic_images = prepare_fake_images(generated_imgs)
             fid = calculate_fid(self.fid_model, self.mu1, self.cov1, synthetic_images)
@@ -81,7 +82,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
         # alpha usually goes from 0 to 1 evenly over ALL the epochs for that depth.
         alpha = ((self.n_epoch * self.steps_per_epoch) + batch) / float(self.steps - 1) #1/219  to 1*110+109/220 for 2 epochs
         
-        # print(f'!!! From GANMonitor: Steps: {self.steps}, Epoch: {self.n_epoch}, Steps per epoch: {self.steps_per_epoch}, Batch: {batch}, Alpha: {alpha}')
+        # print(f"[GANMonitor] Steps: {self.steps}, Epoch: {self.n_epoch}, Steps per epoch: {self.steps_per_epoch}, Batch: {batch}, Alpha: {alpha}")
         
         for layer in self.model.generator.layers:
             if isinstance(layer, WeightedSum):
@@ -89,4 +90,22 @@ class GANMonitor(tf.keras.callbacks.Callback):
         for layer in self.model.discriminator.layers:
             if isinstance(layer, WeightedSum):
                 K.set_value(layer.alpha, alpha)
-                
+
+class FadeInLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+    def __init__(self, initial_lr, min_lr, fade_in_steps):
+        super().__init__()
+        self.initial_lr = initial_lr
+        self.min_lr = min_lr
+        self.fade_in_steps = fade_in_steps
+
+    def __call__(self, step):
+        # decrescita lineare durante il fade-in
+        decay = (1.0 - tf.minimum(step / self.fade_in_steps, 1.0))
+        return self.min_lr + decay * (self.initial_lr - self.min_lr)
+
+    def get_config(self):
+        return {
+            "initial_lr": self.initial_lr,
+            "min_lr": self.min_lr,
+            "fade_in_steps": self.fade_in_steps,
+        }

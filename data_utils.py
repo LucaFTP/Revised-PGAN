@@ -8,11 +8,11 @@ from generic_utils import dynamic_range_opt
 def create_folders(version:str):
     
     CKPT_OUTPUT_PATH = '/leonardo_scratch/fast/uTS25_Fontana/GAN_ckpts' + version
-    IMG_OUTPUT_PATH  = 'results' + version + '/Images'
-    LOSS_OUTPUT_PATH = 'results' + version + '/Loss'
+    IMG_OUTPUT_PATH  = 'results_' + version + '/Images'
+    LOSS_OUTPUT_PATH = 'results_' + version + '/Loss'
 
     try:
-        os.mkdir('results' + version)
+        os.mkdir('results_' + version)
     except FileExistsError:
         pass
     
@@ -39,7 +39,7 @@ def get_unique(data):
 
 def load_meta_data(redshift, show=False):
     meta_data = pd.read_csv("mainframe.csv")
-    meta_data=meta_data[meta_data['redshift']<=redshift]
+    meta_data=meta_data[meta_data['redshift']==redshift]
 
     meta_data = meta_data[['id','redshift', 'mass', 'simulation', 'snap', 
                            'ax', 'rot']].drop_duplicates()

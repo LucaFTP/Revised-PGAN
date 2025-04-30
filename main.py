@@ -15,20 +15,20 @@ parser = ArgumentParser(
     description="Options for the execution of the code."
 )
 parser.add_argument(
-        "-v",
-        "--verbose",
-        type=int,
-        default=1,
-        required=False,
-        help="0 = silent, 1 = progress bar, 2 = one line per epoch."
-    )
+    "-c",
+    "--config-filepath",
+    help="The config filepath for the model/trainer config (Litteral filepath form this file)",
+    type=str,
+    required=True,
+)
 parser.add_argument(
-        "-c",
-        "--config-filepath",
-        help="The config filepath for the model/trainer config (Litteral filepath form this file)",
-        type=str,
-        required=True,
-    )
+    "-v",
+    "--verbose",
+    type=int,
+    default=1,
+    required=False,
+    help="0 = silent, 1 = progress bar, 2 = one line per epoch."
+)
 args = parser.parse_args()
 
 if not os.path.isfile(args.config_filepath):
@@ -53,7 +53,7 @@ mu1, sigma1 = prepare_real_images(fid_model=fid_model, meta_data=meta_data, targ
 pgan = PGAN(pgan_config=model_config)
 
 cbk = GANMonitor(
-    num_img=350,
+    num_img=150,
     latent_dim = model_config.get('latent_dim'),
     plot_every=25,
     fid_model=fid_model,

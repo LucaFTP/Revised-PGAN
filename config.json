@@ -1,13 +1,13 @@
 {
-    "version": "_z_0.15_oneres_128",
+    "version": "alpha_test",
     "train_config": {
-        "z_th": 0.15,
+        "z_th": 0.25,
         "epsilon": 1e-6,
         "mult_factor": 2.5,
-        "start_size": 4,
-        "end_size": 16,
+        "start_size": 64,
+        "end_size": 128,
         "batch_size": [32, 32, 32],
-        "epochs": 5
+        "epochs": 250
     },
     "model_config": {
         "d_steps": 5,
