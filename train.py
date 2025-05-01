@@ -121,6 +121,6 @@ class PGANTrainer:
 
         print(f"\n>> Final training at size {self.end_size}x{self.end_size}")
         dataset = self._make_dataset(self.end_size, self.batch_sizes[max_depth - initial_depth])
-        history_final_step = self._fit_and_log(dataset, f'{max_depth}_final', len(dataset), 2 * self.epochs)
+        history_final_step = self._fit_and_log(dataset, f'{self.pgan.n_depth}_final', len(dataset), 2 * self.epochs)
 
         return self.pgan
