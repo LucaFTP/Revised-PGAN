@@ -54,7 +54,7 @@ pgan = PGAN(pgan_config=model_config)
 
 cbk = GANMonitor(
     num_img=150,
-    latent_dim = model_config.get('latent_dim'),
+    latent_dim=model_config.get('latent_dim'),
     plot_every=25,
     fid_model=fid_model,
     fid_real_par=(mu1, sigma1),

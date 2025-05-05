@@ -46,7 +46,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch, logs=None):
         self.n_epoch = epoch
-        checkpoint_path = f"{self.checkpoint_dir}/pgan_{self.n_epoch:04d}.weights.h5"
+        checkpoint_path = f"{self.checkpoint_dir}/pgan_{self.prefix}_{self.n_epoch:04d}.weights.h5"
         self.checkpoint_path = checkpoint_path
 
     def on_epoch_end(self, epoch, logs=None):
@@ -65,8 +65,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
             print(f"[GANMonitor] Unexpected prefix format: '{self.prefix}'. Skipping FID/weights saving.")
             return
         
-        # if prefix_number == 5 and prefix_state == 'final' and epoch % 10 == 0:
-        if epoch % 25 == 0:
+        if epoch % 15 == 0:
             generated_imgs = self.model.generator([self.random_latent_vectors, self.mass])
             synthetic_images = prepare_fake_images(generated_imgs)
             fid = calculate_fid(self.fid_model, self.mu1, self.cov1, synthetic_images)

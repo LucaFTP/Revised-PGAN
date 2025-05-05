@@ -69,7 +69,9 @@ class PGANTrainer:
         self.cbk.set_prefix(prefix)
         self.cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
         history = self.pgan.fit(dataset, epochs=epochs, callbacks=[self.cbk], verbose=self.verbose)
+        # Save history and FID scores
         np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
+        np.save(f'FID_{prefix}', self.cbk.fid_scores)
         return history
 
     def train(self):
