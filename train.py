@@ -20,12 +20,12 @@ class PGANTrainer:
         self.meta_data = meta_data;         self.config = config
         self.loss_out_path = loss_out_path; self.verbose = kwargs.get('verbose', 1)
 
-        self.start_size  = config['start_size'];   self.end_size = config['end_size']
-        self.batch_sizes = config['batch_size'];   self.epochs   = config['epochs']
+        self.start_size  = config['start_size'];    self.end_size = config['end_size']
+        self.batch_sizes = config['batch_size'];    self.epochs   = config['epochs']
 
-        self.g_lr = config.get('G_LR', 1e-3);      self.beta_1 = config.get('BETA_1', 0.0)
-        self.d_lr = config.get('D_LR', 1e-3);      self.beta_2 = config.get('BETA_2', 0.999)
-        self.r_lr = config.get('R_LR', 1e-3);      self.fade_in_epochs = config.get('fade_in_epochs', 250)
+        self.g_lr = config.get('G_LR', 1e-3);       self.beta_1 = config.get('BETA_1', 0.0)
+        self.d_lr = config.get('D_LR', 1e-3);       self.beta_2 = config.get('BETA_2', 0.999)
+        self.r_lr = config.get('R_LR', 1e-3);       self.fade_in_epochs = config.get('fade_in_epochs', 250)
 
         self.rescale_eps = config.get('EPS', 1e-6); self.mult_factor = config.get('MULT', 2.5)
     
