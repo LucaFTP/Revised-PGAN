@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from keras import Model
+from keras import Model, models
 
 from model_utils.blocks import(
     WeightScalingConv,
@@ -30,14 +30,14 @@ class PGAN(Model):
         
         self.discriminator = self.init_discriminator()
         self.generator = self.init_generator()
-        self.regressor = self.init_regressor()
+        self.regressor = self.init_regressor()  # models.load_model("regressor_results/best_regressor_new_mass_range.keras") # 
 
     def call(self, inputs):
         return
 
     def init_discriminator(self):
         init_shape = (self.min_resolution, self.min_resolution, 1)
-        img_input = tf.keras.layers.Input(shape = init_shape)
+        img_input = tf.keras.layers.Input(shape=init_shape)
         img_input = tf.keras.ops.cast(img_input, tf.float32)
 
         # fromGrayScale
@@ -63,7 +63,7 @@ class PGAN(Model):
         input_shape = list(self.discriminator.input.shape)
         # 1. Double the input resolution. 
         input_shape = (input_shape[1]*2, input_shape[2]*2, input_shape[3]) # 8 x 8 x 2
-        img_input = tf.keras.layers.Input(shape = input_shape)
+        img_input = tf.keras.layers.Input(shape=input_shape)
         img_input = tf.keras.ops.cast(img_input, tf.float32)
 
         # 2. Add pooling layer 
@@ -76,10 +76,10 @@ class PGAN(Model):
 
         # 3.  Define a "fade in" block (x2) with a new "fromGrayScale" and two 3x3 convolutions.
         # symmetric
-        x2 = WeightScalingConv(img_input, filters = self.filters[self.n_depth], kernel_size=(1,1), gain=np.sqrt(2), activate='LeakyReLU') # 8 x 8 x 256
+        x2 = WeightScalingConv(img_input, filters=self.filters[self.n_depth], kernel_size=(1,1), gain=np.sqrt(2), activate='LeakyReLU') # 8 x 8 x 256
 
-        x2 = WeightScalingConv(x2, filters = self.filters[self.n_depth], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU') # 8 x 8 x 256
-        x2 = WeightScalingConv(x2, filters = self.filters[self.n_depth-1], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU') # 8 x 8 x 512
+        x2 = WeightScalingConv(x2, filters=self.filters[self.n_depth], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU') # 8 x 8 x 256
+        x2 = WeightScalingConv(x2, filters=self.filters[self.n_depth-1], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU') # 8 x 8 x 512
 
         x2 = tf.keras.layers.AveragePooling2D(pool_size=(2,2), strides=(2, 2))(x2) # 4 x 4 x 512
 
@@ -129,7 +129,7 @@ class PGAN(Model):
         
         # 1. Double the input resolution. 
         input_shape = (input_shape[1]*2, input_shape[2]*2, input_shape[3]) # 8 x 8 x 2
-        img_input = tf.keras.layers.Input(shape = input_shape)
+        img_input = tf.keras.layers.Input(shape=input_shape)
         img_input = tf.keras.ops.cast(img_input, tf.float32)
 
         # 2. Add pooling layer 
@@ -139,16 +139,12 @@ class PGAN(Model):
         x1 = self.regressor.layers[3](x1) # LeakyReLU
 
         # 3.  Define a "fade in" block (x2) with a new "fromGrayScale" and two 3x3 convolutions.
-        
         if self.n_depth!=5:
-            x2 = RegressorConv(img_input, self.regressor_filters_2[self.n_depth], kernel_size = 1, pooling=None, activate='LeakyReLU', strides=(1,1))
-
-            x2 = RegressorConv(x2, self.regressor_filters[self.n_depth], kernel_size = 3, pooling='max', activate='LeakyReLU', strides=(1,1))
-            
+            x2 = RegressorConv(img_input, self.regressor_filters_2[self.n_depth], kernel_size=1, pooling=None, activate='LeakyReLU', strides=(1,1))
+            x2 = RegressorConv(x2, self.regressor_filters[self.n_depth], kernel_size=3, pooling='max', activate='LeakyReLU', strides=(1,1))
         else:
-            x2 = RegressorConv(img_input, self.regressor_filters[self.n_depth], kernel_size = 3, pooling='max', activate='LeakyReLU', strides=(1,1))
+            x2 = RegressorConv(img_input, self.regressor_filters[self.n_depth], kernel_size=3, pooling='max', activate='LeakyReLU', strides=(1,1))
 
-        
         # 4. Weighted Sum x1 and x2 to smoothly put the "fade in" block. 
         x = WeightedSum()([x1, x2])
 
@@ -167,51 +163,46 @@ class PGAN(Model):
         self.regressor = self.regressor_stabilize
 
     def init_generator(self):
-        noise = tf.keras.layers.Input(shape=(self.latent_dim,)) # None, 512
-        mass = tf.keras.layers.Input(shape=(1,))
-        
-        merge = tf.keras.layers.Concatenate()([noise, mass]) #L x (3)
-                
+        noise = tf.keras.layers.Input(shape=(self.latent_dim,), name='noise_input') # None, latent_dim
+        mass  = tf.keras.layers.Input(shape=(1,), name='mass_input') # None, 1
+        merge = tf.keras.layers.Concatenate()([noise, mass]) # None, latent_dim+1
+
         # Actual size(After doing reshape) is just FILTERS[0], so divide gain by 4
- 
         x = WeightScalingDense(merge, filters=self.min_resolution*self.min_resolution*self.filters[0], gain=np.sqrt(2)/4, activate='LeakyReLU', use_pixelnorm=False) 
         
         x = tf.keras.layers.Reshape((self.min_resolution, self.min_resolution, self.filters[0]))(x)
 
-        # x = WeightScalingConv(x, filters = FILTERS[0], kernel_size=(4,4), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=False)
-        x = WeightScalingConv(x, filters = self.filters[0], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=False)
-        x = WeightScalingConv(x, filters = self.filters[0], kernel_size=(2,2), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True)
+        x = WeightScalingConv(x, filters=self.filters[0], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=False) # 4 x 4 x 512
+        x = WeightScalingConv(x, filters=self.filters[0], kernel_size=(2,2), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True) # 4 x 4 x 512
 
-        # Gain should be 1 as its the last layer 
+        # Gain should be 1 as its the last layer
         x = WeightScalingConv(x, filters=1, kernel_size=(1,1), gain=1., activate='tanh', use_pixelnorm=False) # change to tanh and understand gain 1 if training unstable
         x = (x + 1)/2 # Limits the values between 0 and 1
-        
+
         g_model = Model([noise,mass], x, name='generator')
 
         return g_model
 
     # Fade in upper resolution block
     def fade_in_generator(self):
-
+        
         # 1. Get the node above the “toGrayScale” block 
         block_end = self.generator.layers[-5].output
         
         # 2. Upsample block_end
         block_end = tf.keras.layers.UpSampling2D((2,2))(block_end) # 8 x 8 x 512
-        # block_end = tf.keras.layers.Conv2DTranspose(filters=FILTERS[self.n_depth-1], kernel_size=(3,3), strides=(2,2), padding='same')(block_end)
 
         # 3. Reuse the existing “toGrayScale” block defined as“x1”. --- SKIP CONNECTION (ALREADY STABILIZED)
         x1 = self.generator.layers[-4](block_end) # Conv2d
         x1 = self.generator.layers[-3](x1) # WeightScalingLayer
         x1 = self.generator.layers[-2](x1) # Bias
         x1 = self.generator.layers[-1](x1) # tanh
+        x1 = (x1 + 1)/2 # Limits the values between 0 and 1
 
         # 4. Define a "fade in" block (x2) with two 3x3 convolutions and a new "toRGB".
-        x2 = WeightScalingConv(block_end, filters = self.filters[self.n_depth-1], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True) # 8 x 8 x 512 
+        x2 = WeightScalingConv(block_end, filters=self.filters[self.n_depth-1], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True) # 8 x 8 x 512 
+        x2 = WeightScalingConv(x2, filters=self.filters[self.n_depth], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True) # 8 x 8 x 512   
         
-        x2 = WeightScalingConv(x2, filters = self.filters[self.n_depth], kernel_size=(3,3), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True) # 8 x 8 x 512 
-        # x2 = WeightScalingConv(x2, filters = FILTERS[self.n_depth], kernel_size=(2,2), gain=np.sqrt(2), activate='LeakyReLU', use_pixelnorm=True) # Need to test the performance with smaller kernels
-  
         # "toGrayScale"
         x2 = WeightScalingConv(x2, filters=1, kernel_size=(1,1), gain=1., activate='tanh', use_pixelnorm=False) # 
         x2 = (x2 + 1)/2 # Limits the values between 0 and 1
@@ -257,7 +248,7 @@ class PGAN(Model):
 
     def train_step(self, data):
         
-        real_images, real_mass = data       
+        real_images, real_mass = data
         batch_size = tf.shape(real_images)[0]
         indices = tf.random.shuffle(tf.range(2 * batch_size))
 
@@ -286,10 +277,10 @@ class PGAN(Model):
                 drift = tf.reduce_mean(tf.square(pred_logits))
 
                 # WGAN-GP
-                d_loss = d_cost + (self.gp_weight * gp) + (self.drift_weight * drift) 
+                d_loss = d_cost + (self.gp_weight * gp) + (self.drift_weight * drift)
 
             d_gradient = d_tape.gradient(d_loss, self.discriminator.trainable_weights)
-            self.d_optimizer.apply_gradients(zip(d_gradient, self.discriminator.trainable_weights))     
+            self.d_optimizer.apply_gradients(zip(d_gradient, self.discriminator.trainable_weights))
         
         with tf.GradientTape() as r_tape:
 
@@ -297,19 +288,18 @@ class PGAN(Model):
             pred_mass = self.regressor(real_images, training=True)
 
             # Loss on mass 
-            r_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, pred_mass) 
+            r_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, pred_mass)
 
         r_gradient = r_tape.gradient(r_loss, self.regressor.trainable_weights) 
         self.r_optimizer.apply_gradients(zip(r_gradient, self.regressor.trainable_weights))
-
         
         with tf.GradientTape() as g_tape:
             
             random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
                         
             gen = self.generator([random_latent_vectors, real_mass], training=True)
-            predictions = self.discriminator(gen, training = False)
-            predictions_mass = self.regressor(gen, training = False)
+            predictions  = self.discriminator(gen, training=False)
+            predictions_mass = self.regressor(gen, training=False)
             
             # Total generator loss
             mass_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, predictions_mass)
@@ -317,10 +307,9 @@ class PGAN(Model):
             g_cost = tf.reduce_mean(predictions)
             g_loss = -g_cost + self.mass_loss_weight * mass_loss
             
-            
         # Get the gradients
         g_gradient = g_tape.gradient(g_loss , self.generator.trainable_weights)
         # Update the weights 
         self.g_optimizer.apply_gradients(zip(g_gradient, self.generator.trainable_weights))
         
-        return {'d_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss, 'r_loss': r_loss}
+        return {'d_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss}

@@ -31,7 +31,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
         self.plot_every = plot_every
         self.random_latent_vectors = tf.random.normal(shape=[num_img, latent_dim])
         self.mass = tf.convert_to_tensor(np.round(tf.random.uniform(
-                        shape=[num_img, 1], minval=14,maxval=15),2))
+                        shape=[num_img, 1], minval=1.6,maxval=16.2),2))
         
         # FID score tracking
         self.fid_scores = [];   self.fid_model = fid_model;   self.mu1, self.cov1 = fid_real_par
@@ -80,7 +80,6 @@ class GANMonitor(tf.keras.callbacks.Callback):
         # Update alpha in WeightedSum layers
         # alpha usually goes from 0 to 1 evenly over ALL the epochs for that depth.
         alpha = ((self.n_epoch * self.steps_per_epoch) + batch) / float(self.steps - 1) #1/219  to 1*110+109/220 for 2 epochs
-        
         # print(f"[GANMonitor] Steps: {self.steps}, Epoch: {self.n_epoch}, Steps per epoch: {self.steps_per_epoch}, Batch: {batch}, Alpha: {alpha}")
         
         for layer in self.model.generator.layers:

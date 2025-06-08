@@ -25,7 +25,7 @@ class PGANTrainer:
 
         self.g_lr = config.get('G_LR', 1e-3);       self.beta_1 = config.get('BETA_1', 0.0)
         self.d_lr = config.get('D_LR', 1e-3);       self.beta_2 = config.get('BETA_2', 0.999)
-        self.r_lr = config.get('R_LR', 1e-3);       self.fade_in_epochs = config.get('fade_in_epochs', 250)
+        self.r_lr = config.get('R_LR', 1e-3);       self.fade_in_epochs = config.get('fade_in_epochs', 50)
 
         self.rescale_eps = config.get('EPS', 1e-6); self.mult_factor = config.get('MULT', 2.5)
     
@@ -61,8 +61,8 @@ class PGANTrainer:
 
     def _make_dataset(self, size, batch_size):
         return CustomDataGen(
-            self.meta_data, X_col='id', y_col='mass', batch_size=batch_size,
-            target_size=(size, size), shuffle=True, epsilon=self.rescale_eps, mult_factor=self.mult_factor
+            self.meta_data, batch_size=batch_size, target_size=(size, size),
+            shuffle=True, epsilon=self.rescale_eps, mult_factor=self.mult_factor
         )
 
     def _fit_and_log(self, dataset, prefix, steps, epochs):
