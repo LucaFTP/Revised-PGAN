@@ -28,6 +28,15 @@ class PGANTrainer:
         self.r_lr = config.get('R_LR', 1e-3);       self.fade_in_epochs = config.get('fade_in_epochs', 50)
 
         self.rescale_eps = config.get('EPS', 1e-6); self.mult_factor = config.get('MULT', 2.5)
+
+        self.ckpt_callback = keras.callbacks.ModelCheckpoint(
+            filepath="pgan_best_mass_loss.weights.h5",
+            monitor='mass_loss',
+            mode='min',
+            save_weights_only=True,
+            save_best_only=True,
+            verbose=1
+        )
     
     def init_optimizers(self, fade_in=False, steps=None):
         if fade_in:
@@ -68,7 +77,7 @@ class PGANTrainer:
     def _fit_and_log(self, dataset, prefix, steps, epochs):
         self.cbk.set_prefix(prefix)
         self.cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
-        history = self.pgan.fit(dataset, epochs=epochs, callbacks=[self.cbk], verbose=self.verbose)
+        history = self.pgan.fit(dataset, epochs=epochs, callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
         # Save history and FID scores
         np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
         np.save(f'FID_{prefix}', self.cbk.fid_scores)
