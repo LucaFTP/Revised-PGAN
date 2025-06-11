@@ -39,7 +39,8 @@ def get_unique(data):
 
 def load_meta_data(redshift, show=False):
     meta_data = pd.read_csv("mainframe.csv")
-    meta_data=meta_data[meta_data['redshift']<=redshift]
+    meta_data = meta_data[meta_data['redshift']<=redshift]
+    meta_data = meta_data[meta_data['snap'] != 31.0] # È una mappa strana, ha una massa molto alta ma il picco di segnale è concentrato in pochi pixel
 
     meta_data = meta_data[['id','redshift', 'mass', 'simulation', 'snap', 
                            'ax', 'rot']].drop_duplicates()
@@ -99,8 +100,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
         y_col_batch = batches[self.y_col]
 
         X_batch = np.asarray([self.__get_input(x, y, self.target_size) for x, y in zip(X_col_batch, y_col_batch)])
-        # y_batch = np.asarray([self.__get_output(10**(y - self.meta_data[self.y_col].min())) for y in y_col_batch])
-        y_batch = np.asarray([self.__get_output(10**(y - 13.5)) for y in y_col_batch])
+        y_batch = np.asarray([self.__get_output(10**(y - 13.8)) for y in y_col_batch])
 
         return X_batch, y_batch
 
@@ -117,6 +117,8 @@ class CustomDataGen(tf.keras.utils.Sequence):
 if __name__ == "__main__":
     # Example usage
     meta_data = load_meta_data(redshift=0.25, show=True)
+    print("Loaded meta data.")
+    print(f"Maximum mass: {meta_data['mass'].max()} \t Minimum mass: {meta_data['mass'].min()}")
     data_gen = CustomDataGen(meta_data, batch_size=32, target_size=(128, 128))
 
     for X, y in data_gen:

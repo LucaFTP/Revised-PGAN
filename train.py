@@ -95,11 +95,11 @@ class PGANTrainer:
             self.pgan.n_depth = n_depth
             self.pgan.fade_in_generator()
             self.pgan.fade_in_discriminator()
-            self.pgan.fade_in_regressor()
+            # self.pgan.fade_in_regressor()
 
             self.pgan.stabilize_generator()
             self.pgan.stabilize_discriminator()
-            self.pgan.stabilize_regressor()
+            # self.pgan.stabilize_regressor()
         
         print(f"Starting training at {self.start_size}x{self.start_size}")
         self.init_optimizers()

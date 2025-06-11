@@ -31,7 +31,7 @@ class GANMonitor(tf.keras.callbacks.Callback):
         self.plot_every = plot_every
         self.random_latent_vectors = tf.random.normal(shape=[num_img, latent_dim])
         self.mass = tf.convert_to_tensor(np.round(tf.random.uniform(
-                        shape=[num_img, 1], minval=1.6,maxval=16.2),2))
+                        shape=[num_img, 1], minval=10,maxval=16),2))
         
         # FID score tracking
         self.fid_scores = [];   self.fid_model = fid_model;   self.mu1, self.cov1 = fid_real_par
