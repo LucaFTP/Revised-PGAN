@@ -30,7 +30,7 @@ class PGAN(Model):
         
         self.discriminator = self.init_discriminator()
         self.generator = self.init_generator()
-        self.regressor = self.init_regressor()  # models.load_model("regressor_results/best_regressor_new_mass_range.keras") # 
+        self.regressor = models.load_model("regressor_results/best_regressor_new_mass_range.keras") #  self.init_regressor()  #
 
     def call(self, inputs):
         return
@@ -281,7 +281,7 @@ class PGAN(Model):
 
             d_gradient = d_tape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(zip(d_gradient, self.discriminator.trainable_weights))
-        
+        '''
         with tf.GradientTape() as r_tape:
 
             # Train regressor
@@ -292,7 +292,7 @@ class PGAN(Model):
 
         r_gradient = r_tape.gradient(r_loss, self.regressor.trainable_weights) 
         self.r_optimizer.apply_gradients(zip(r_gradient, self.regressor.trainable_weights))
-        
+        '''
         with tf.GradientTape() as g_tape:
             
             random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))

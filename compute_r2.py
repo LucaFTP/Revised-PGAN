@@ -23,7 +23,7 @@ def compute_tstr_trst(
     tstr_regressor.compile(keras.optimizers.Adam(learning_rate=5e-4),  loss=keras.losses.MeanSquaredError())
 
     early_stop =  keras.callbacks.EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True)
-    history = tstr_regressor.fit(x_train, y_train,  validation_data=(x_val,y_val), epochs=100, batch_size=batch_size, callbacks=[early_stop]) 
+    history = tstr_regressor.fit(x_train, y_train, validation_data=(x_val,y_val), epochs=100, batch_size=batch_size, callbacks=[early_stop]) 
 
     real_dataset = CustomDataGen(meta_data, batch_size=batch_size, target_size=(tstr_regressor.input_shape[1], tstr_regressor.input_shape[2]), shuffle=True)
     r2_score_dist = np.empty((len(real_dataset),))
