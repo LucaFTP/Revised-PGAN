@@ -27,7 +27,7 @@ class PGANTrainer:
         self.d_lr = config.get('D_LR', 1e-3);       self.beta_2 = config.get('BETA_2', 0.999)
         self.r_lr = config.get('R_LR', 1e-3);       self.fade_in_epochs = config.get('fade_in_epochs', 50)
 
-        self.rescale_eps = config.get('EPS', 1e-6); self.mult_factor = config.get('MULT', 2.5)
+        self.eps = config.get('epsilon', 1e-6);     self.mult_factor = config.get('mult_factor', 2.5)
 
         self.ckpt_callback = keras.callbacks.ModelCheckpoint(
             filepath="pgan_best_mass_loss.weights.h5",
@@ -71,7 +71,7 @@ class PGANTrainer:
     def _make_dataset(self, size, batch_size):
         return CustomDataGen(
             self.meta_data, batch_size=batch_size, target_size=(size, size),
-            shuffle=True, epsilon=self.rescale_eps, mult_factor=self.mult_factor
+            shuffle=True, epsilon=self.eps, mult_factor=self.mult_factor
         )
 
     def _fit_and_log(self, dataset, prefix, steps, epochs):
