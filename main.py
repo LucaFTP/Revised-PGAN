@@ -29,6 +29,14 @@ parser.add_argument(
     required=False,
     help="0 = silent, 1 = progress bar, 2 = one line per epoch."
 )
+parser.add_argument(
+    "-m",
+    "--model-milestone",
+    type=str,
+    default=None,
+    required=False,
+    help="The model milestone to load. If None, the latest model will be loaded."
+)
 args = parser.parse_args()
 
 if not os.path.isfile(args.config_filepath):
@@ -50,7 +58,7 @@ print(f"Data Shape: {meta_data.shape}")
 fid_model = InceptionV3(include_top=False, pooling='avg', input_shape=(299,299,3))
 mu1, sigma1 = prepare_real_images(fid_model=fid_model, meta_data=meta_data, target_size=train_config.get('end_size'))
 
-pgan = PGAN(pgan_config=model_config)
+pgan = PGAN(pgan_config=model_config, version=version)
 
 cbk = GANMonitor(
     num_img=150,
@@ -68,6 +76,7 @@ trainer = PGANTrainer(
     pgan=pgan,
     cbk=cbk,
     loss_out_path=LOSS_OUTPUT_PATH,
-    verbose=args.verbose
+    verbose=args.verbose,
+    milestone=args.model_milestone
     )
 trainer.train()

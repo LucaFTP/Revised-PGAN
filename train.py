@@ -29,6 +29,8 @@ class PGANTrainer:
 
         self.eps = config.get('epsilon', 1e-6);     self.mult_factor = config.get('mult_factor', 2.5)
 
+        self.milestone = kwargs.get('milestone', None)
+
         self.ckpt_callback = keras.callbacks.ModelCheckpoint(
             filepath="pgan_best_mass_loss.weights.h5",
             monitor='mass_loss',
@@ -77,7 +79,8 @@ class PGANTrainer:
     def _fit_and_log(self, dataset, prefix, steps, epochs):
         self.cbk.set_prefix(prefix)
         self.cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
-        history = self.pgan.fit(dataset, epochs=epochs, callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
+        history = self.pgan.fit(dataset, epochs=epochs, initial_epoch=int(self.milestone) if self.milestone else 0,
+                                callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
         # Save history and FID scores
         np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
         np.save(f'FID_{prefix}', self.cbk.fid_scores)
@@ -102,6 +105,9 @@ class PGANTrainer:
             # self.pgan.stabilize_regressor()
         
         print(f"Starting training at {self.start_size}x{self.start_size}")
+        if self.milestone is not None:
+            print(f"Using milestone: {self.milestone}")
+            self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_5_init_{self.milestone}.weights.h5")
         self.init_optimizers()
         dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
         history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs)

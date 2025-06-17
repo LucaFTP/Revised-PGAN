@@ -21,17 +21,22 @@ class GANMonitor(tf.keras.callbacks.Callback):
             checkpoint_dir:str,
             fid_model,
             fid_real_par:tuple[float, float],
-            prefix:str = ''
+            prefix:str = '',
+            **kwargs
             ):
 
         # Prefix for correct saving path
         self.prefix  = prefix;   self.image_path = image_path;   self.checkpoint_dir = checkpoint_dir
-        
+
+        # In case of milestone, define an initial epoch different from 0
+        self.milestone = kwargs.get('milestone', None)
+        self.delta = int(self.milestone) if self.milestone is not None else 0
+
         # Latent vectors initialization
         self.plot_every = plot_every
         self.random_latent_vectors = tf.random.normal(shape=[num_img, latent_dim])
         self.mass = tf.convert_to_tensor(np.round(tf.random.uniform(
-                        shape=[num_img, 1], minval=10,maxval=16),2))
+                        shape=[num_img, 1], minval=1, maxval=16), 2))
         
         # FID score tracking
         self.fid_scores = [];   self.fid_model = fid_model;   self.mu1, self.cov1 = fid_real_par
@@ -41,11 +46,11 @@ class GANMonitor(tf.keras.callbacks.Callback):
         
     def set_steps(self, steps_per_epoch, epochs):
         self.steps_per_epoch = steps_per_epoch
-        self.epochs = epochs
+        self.epochs = epochs + self.delta
         self.steps = self.steps_per_epoch * self.epochs
 
     def on_epoch_begin(self, epoch, logs=None):
-        self.n_epoch = epoch
+        self.n_epoch = epoch + self.delta
         checkpoint_path = f"{self.checkpoint_dir}/pgan_{self.prefix}_{self.n_epoch:04d}.weights.h5"
         self.checkpoint_path = checkpoint_path
 
@@ -53,8 +58,8 @@ class GANMonitor(tf.keras.callbacks.Callback):
         self.n_epoch = epoch
 
         # Plot
-        if epoch % self.plot_every == 0:
-            save_path = f'{self.image_path}/plot_{self.prefix}_{epoch:03d}.png'
+        if (epoch + self.delta) % self.plot_every == 0:
+            save_path = f'{self.image_path}/plot_{self.prefix}_{epoch + self.delta:03d}.png'
             plot_images(self.model.generator([self.random_latent_vectors, self.mass]), save_path=save_path)
 
         # Save weights + FID
@@ -64,8 +69,8 @@ class GANMonitor(tf.keras.callbacks.Callback):
         except ValueError:
             print(f"[GANMonitor] Unexpected prefix format: '{self.prefix}'. Skipping FID/weights saving.")
             return
-        
-        if epoch % 15 == 0:
+
+        if (epoch + self.delta) % 15 == 0:
             generated_imgs = self.model.generator([self.random_latent_vectors, self.mass])
             synthetic_images = prepare_fake_images(generated_imgs)
             fid = calculate_fid(self.fid_model, self.mu1, self.cov1, synthetic_images)

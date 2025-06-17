@@ -15,7 +15,8 @@ from model_utils.layers import(
 class PGAN(Model):
     def __init__(
             self,
-            pgan_config: dict
+            pgan_config: dict,
+            version: str = None
             ):
         super(PGAN, self).__init__()
         
@@ -30,7 +31,7 @@ class PGAN(Model):
         
         self.discriminator = self.init_discriminator()
         self.generator = self.init_generator()
-        self.regressor = models.load_model("regressor_results/best_regressor_new_mass_range.keras") #  self.init_regressor()  #
+        self.regressor = models.load_model(f"regressor_results/best_regressor_{version}.keras") #  self.init_regressor()  #
 
     def call(self, inputs):
         return
