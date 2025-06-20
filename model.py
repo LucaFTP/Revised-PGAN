@@ -16,10 +16,12 @@ class PGAN(Model):
     def __init__(
             self,
             pgan_config: dict,
+            *,
             version: str = None
             ):
         super(PGAN, self).__init__()
         
+        self.version = version
         self.latent_dim = pgan_config.get('latent_dim');        self.d_steps = pgan_config.get('d_steps')
         self.gp_weight  = pgan_config.get('gp_weight', 10);     self.drift_weight = pgan_config.get('drift_weight', 0.001)
         self.min_resolution = pgan_config.get('min_res', 4);    self.mass_loss_weight = pgan_config.get('mass_loss_weight', 1)
@@ -29,9 +31,9 @@ class PGAN(Model):
         self.regressor_filters = [50, 50, 50, 50, 20, 10, 10]
         self.regressor_filters_2 = [50, 50, 50, 20, 10, 10, 10]
         
-        self.discriminator = self.init_discriminator()
         self.generator = self.init_generator()
-        self.regressor = models.load_model(f"regressor_results/best_regressor_{version}.keras") #  self.init_regressor()  #
+        self.discriminator = self.init_discriminator()
+        self.regressor = models.load_model(f"results/regressor_results/best_regressor_{version}.keras") if version else self.init_regressor()
 
     def call(self, inputs):
         return
@@ -282,18 +284,7 @@ class PGAN(Model):
 
             d_gradient = d_tape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(zip(d_gradient, self.discriminator.trainable_weights))
-        '''
-        with tf.GradientTape() as r_tape:
-
-            # Train regressor
-            pred_mass = self.regressor(real_images, training=True)
-
-            # Loss on mass 
-            r_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, pred_mass)
-
-        r_gradient = r_tape.gradient(r_loss, self.regressor.trainable_weights) 
-        self.r_optimizer.apply_gradients(zip(r_gradient, self.regressor.trainable_weights))
-        '''
+        
         with tf.GradientTape() as g_tape:
             
             random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
@@ -312,5 +303,19 @@ class PGAN(Model):
         g_gradient = g_tape.gradient(g_loss , self.generator.trainable_weights)
         # Update the weights 
         self.g_optimizer.apply_gradients(zip(g_gradient, self.generator.trainable_weights))
+
+        if self.version:
+            return {'d_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss}
         
-        return {'d_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss}
+        else:
+            with tf.GradientTape() as r_tape:
+
+                # Train regressor
+                pred_mass = self.regressor(real_images, training=True)
+
+                # Loss on mass 
+                r_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, pred_mass)
+
+            r_gradient = r_tape.gradient(r_loss, self.regressor.trainable_weights) 
+            self.r_optimizer.apply_gradients(zip(r_gradient, self.regressor.trainable_weights))
+            return {'r_loss': r_loss, 'd_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss}

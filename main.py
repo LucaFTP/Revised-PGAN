@@ -37,6 +37,14 @@ parser.add_argument(
     required=False,
     help="The model milestone to load. If None, the latest model will be loaded."
 )
+parser.add_argument(
+    "-r",
+    "--trained-regressor",
+    type=bool,
+    default=False,
+    required=False,
+    help="If True, the regressor will be trained. If False, the regressor will be a pre-trained model."
+)
 args = parser.parse_args()
 
 if not os.path.isfile(args.config_filepath):
@@ -58,7 +66,7 @@ print(f"Data Shape: {meta_data.shape}")
 fid_model = InceptionV3(include_top=False, pooling='avg', input_shape=(299,299,3))
 mu1, sigma1 = prepare_real_images(fid_model=fid_model, meta_data=meta_data, target_size=train_config.get('end_size'))
 
-pgan = PGAN(pgan_config=model_config, version=version)
+pgan = PGAN(pgan_config=model_config, version=version if args.trained_regressor else None)
 
 cbk = GANMonitor(
     num_img=150,

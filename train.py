@@ -83,7 +83,7 @@ class PGANTrainer:
                                 callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
         # Save history and FID scores
         np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
-        np.save(f'FID_{prefix}', self.cbk.fid_scores)
+        if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.cbk.fid_scores)
         return history
 
     def train(self):
@@ -98,16 +98,19 @@ class PGANTrainer:
             self.pgan.n_depth = n_depth
             self.pgan.fade_in_generator()
             self.pgan.fade_in_discriminator()
-            # self.pgan.fade_in_regressor()
+            if self.pgan.version is None: self.pgan.fade_in_regressor()
 
             self.pgan.stabilize_generator()
             self.pgan.stabilize_discriminator()
-            # self.pgan.stabilize_regressor()
+            if self.pgan.version is None: self.pgan.stabilize_regressor()
         
         print(f"Starting training at {self.start_size}x{self.start_size}")
         if self.milestone is not None:
             print(f"Using milestone: {self.milestone}")
-            self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_5_init_{self.milestone}.weights.h5")
+            if self.end_size == self.start_size:
+                self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_init_{self.milestone}.weights.h5")
+            else:
+                self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_final_{self.milestone}.weights.h5")
         self.init_optimizers()
         dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
         history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs)

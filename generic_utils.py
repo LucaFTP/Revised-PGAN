@@ -37,7 +37,7 @@ def dynamic_range_opt(array, epsilon=1e-6, mult_factor=1):
     return a/b * mult_factor
 
 def inv_dynamic_range(synth_img, eps=1e-6, mult_factor=1):
-    synth_img = tf.image.resize(synth_img, (128, 128))
+    # synth_img = tf.image.resize(synth_img, (128, 128))
     image = synth_img[:]/mult_factor
     a = - eps**(1 - image)
     b = eps**image - 1

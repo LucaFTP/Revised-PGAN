@@ -8,11 +8,11 @@ from generic_utils import dynamic_range_opt
 def create_folders(version:str):
     
     CKPT_OUTPUT_PATH = '/leonardo_scratch/fast/uTS25_Fontana/GAN_ckpts_' + version
-    IMG_OUTPUT_PATH  = 'results_' + version + '/Images'
-    LOSS_OUTPUT_PATH = 'results_' + version + '/Loss'
+    IMG_OUTPUT_PATH  = 'results/results_' + version + '/Images'
+    LOSS_OUTPUT_PATH = 'results/results_' + version + '/Loss'
 
     try:
-        os.mkdir('results_' + version)
+        os.mkdir('results/results_' + version)
     except FileExistsError:
         pass
     
