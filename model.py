@@ -31,8 +31,8 @@ class PGAN(Model):
         self.regressor_filters = [50, 50, 50, 50, 20, 10, 10]
         self.regressor_filters_2 = [50, 50, 50, 20, 10, 10, 10]
         
-        self.generator = self.init_generator()
         self.discriminator = self.init_discriminator()
+        self.generator = self.init_generator()
         self.regressor = models.load_model(f"results/regressor_results/best_regressor_{version}.keras") if version else self.init_regressor()
 
     def call(self, inputs):
