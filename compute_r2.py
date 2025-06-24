@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import tensorflow as tf
+from argparse import ArgumentParser
 from sklearn import metrics, model_selection
 
 from model import PGAN
@@ -53,7 +54,26 @@ def compute_tstr_trst(
 
 def main():
 
-    with open("config_latent_8.json", "r") as f:
+    parser = ArgumentParser(
+        description="Set parameters for script execution."
+    )
+    parser.add_argument(
+        "c",
+        "--config-file",
+        type=str,
+        required=True,
+        help="Configuration file to use for the model. Only the filename, the folder path is added automatically."
+        )
+    parser.add_argument(
+        "-e",
+        "--best-epoch",
+        type=str,
+        required=True,
+        help="Best epoch to load weights from. It should be a string with lenght four representing the epoch number (e.g., '1485' or '0050')."
+        )
+    args = parser.parse_args()
+
+    with open(f"config_file_dir/{args.config_file}", "r") as f:
         config = json.load(f)
     
     model_config = config["model_config"]
@@ -72,16 +92,17 @@ def main():
         model.stabilize_generator()
         model.stabilize_discriminator()
 
-    best_epoch = "1470"
+    best_epoch = args.best_epoch
+    print(f"Loading weights from epoch {best_epoch} for version {version}...")
     ckpt_path = f"/leonardo_scratch/fast/uTS25_Fontana/GAN_ckpts_{version}/pgan_5_init_{best_epoch}.weights.h5"
     model.load_weights(ckpt_path)
 
     y_true, y_pred, r2_scores = compute_tstr_trst(train_config,model, meta_data, num_imgs=10000, batch_size=128)
     print(f"Mean R2 score: {np.mean(r2_scores):.3f}")
     print(f"Standard deviation of R2 scores: {np.std(r2_scores):.3f}")
-    np.save(f"r2_scores_{version}.npy", r2_scores)
-    np.save(f"y_true_{version}.npy", y_true)
-    np.save(f"y_pred_{version}.npy", y_pred)
+    np.save(f"results/results_{version}/r2_scores_{version}.npy", r2_scores)
+    np.save(f"results/results_{version}/y_true_{version}.npy", y_true)
+    np.save(f"results/results_{version}/y_pred_{version}.npy", y_pred)
 
 if __name__ == "__main__":
     main()
