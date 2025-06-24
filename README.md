@@ -1,2 +1,2 @@
 # Revised-PGAN
-Revised version of the PGAN code situated in another repository
+Progressive growing GAN with regressor for image generation conditioning. Developed for tSZ maps.
