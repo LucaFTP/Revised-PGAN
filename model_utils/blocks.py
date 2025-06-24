@@ -12,7 +12,7 @@ def WeightScalingDense(x, filters, gain, use_pixelnorm=False, activate=None):
     in_filters = K.int_shape(x)[-1]
     x = keras.layers.Dense(filters, use_bias=False, kernel_initializer=init, dtype='float32')(x)
     x = WeightScaling(shape=(in_filters), gain=gain)(x)
-    x = Bias(input_shape=x.shape)(x)
+    x = Bias()(x)
     if activate=='LeakyReLU':
         x = keras.layers.LeakyReLU(0.2)(x)
     elif activate=='tanh':
@@ -27,7 +27,7 @@ def WeightScalingConv(x, filters, kernel_size, gain, use_pixelnorm=False, activa
     in_filters = K.int_shape(x)[-1]
     x = keras.layers.Conv2D(filters, kernel_size, strides=strides, use_bias=False, padding="same", kernel_initializer=init, dtype='float32')(x)
     x = WeightScaling(shape=(kernel_size[0], kernel_size[1], in_filters), gain=gain)(x)
-    x = Bias(input_shape=x.shape)(x)
+    x = Bias()(x)
     if activate=='LeakyReLU':
         x = keras.layers.LeakyReLU(0.2)(x)
     elif activate=='tanh':

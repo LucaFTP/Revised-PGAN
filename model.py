@@ -31,9 +31,9 @@ class PGAN(Model):
         self.regressor_filters = [50, 50, 50, 50, 20, 10, 10]
         self.regressor_filters_2 = [50, 50, 50, 20, 10, 10, 10]
         
-        self.discriminator = self.init_discriminator()
-        self.generator = self.init_generator()
-        self.regressor = models.load_model(f"results/regressor_results/best_regressor_{version}.keras") if version else self.init_regressor()
+        self.discriminator = self.init_discriminator();         self.generator = self.init_generator()
+        regressor_ckpt_folder = "/leonardo/home/userexternal/lfontana/GAN/Revised-PGAN/results/regressor_results"
+        self.regressor = models.load_model(f"{regressor_ckpt_folder}/best_regressor_{version}.keras") if version else self.init_regressor()
 
     def call(self, inputs):
         return
