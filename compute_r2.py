@@ -18,7 +18,6 @@ def compute_tstr_trst(
         train_config: dict, model: PGAN, meta_data: pd.DataFrame, num_imgs: int=2500, batch_size: int=64
     ) -> np.ndarray:
 
-    
     random_latent_vectors = tf.random.normal(shape=[num_imgs, model.latent_dim])
     random_mass = to_mass_range(np.round(tf.random.uniform([num_imgs, 1], minval=13.8, maxval=15.), 2))
 
@@ -27,6 +26,9 @@ def compute_tstr_trst(
     generated_imgs = model.generator.predict([random_latent_vectors, random_mass])  # num_images x end_size x end_size x 1
     print(f"Image generation completed in {timeit.default_timer() - time_0:.2f} seconds.")
     
+    # random_mass = np.load("/leonardo/home/userexternal/lfontana/DIFFUSION/Conditioned/results/test_v1/masses-45.npy")
+    # generated_imgs = np.load("/leonardo/home/userexternal/lfontana/DIFFUSION/Conditioned/results/test_v1/images-45.npy")
+
     x_train, x_val, y_train, y_val = model_selection.train_test_split(generated_imgs, random_mass, test_size=0.3)
 
     regressor_model = build_regressor(image_size=generated_imgs.shape[1], filters=[50, 50, 50, 20, 10])
@@ -58,7 +60,7 @@ def main():
         description="Set parameters for script execution."
     )
     parser.add_argument(
-        "c",
+        "-c",
         "--config-file",
         type=str,
         required=True,
