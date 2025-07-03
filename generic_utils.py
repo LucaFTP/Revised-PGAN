@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
+from typing import Callable
 from scipy.linalg import sqrtm
+from argparse import ArgumentParser
 from matplotlib import pyplot as plt
 from skimage.transform import resize
 from tensorflow.keras.applications.inception_v3 import preprocess_input # type: ignore
@@ -88,3 +90,21 @@ def prepare_fake_images(synthetic_set):
     synth_imgs = scale_images(synth_imgs, (299, 299, 3))
 
     return synth_imgs
+
+def parser(
+    prog_name: str, dscr: str, get_args: Callable[[ArgumentParser], ArgumentParser]
+) -> Callable[[Callable], Callable]:
+    def decorator(function):
+        def new_function(*args, **kwargs):
+            prs = ArgumentParser(
+                prog=prog_name,
+                description=dscr,
+            )
+
+            prs = get_args(prs)
+            args = prs.parse_args()
+            function(args)
+
+        return new_function
+
+    return decorator
