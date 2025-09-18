@@ -40,7 +40,7 @@ def get_unique(data):
 def load_meta_data(redshift, show=False):
     meta_data = pd.read_csv("mainframe.csv")
     meta_data = meta_data[meta_data['redshift']<=redshift]
-    meta_data = meta_data[meta_data['snap'] != 31.0] # È una mappa strana, ha una massa molto alta ma il picco di segnale è concentrato in pochi pixel
+    meta_data = meta_data[meta_data['redshift']>=0.2]
 
     meta_data = meta_data[['id','redshift', 'mass', 'simulation', 'snap', 
                            'ax', 'rot']].drop_duplicates()
@@ -85,6 +85,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
 
         img = np.load(file_name).astype('float32')
         # img = physical_units_zoom(img=img, mass=mass, side_length=3000)
+        img = img[362:662, 332:662]
         img = tf.image.resize(np.expand_dims(img, axis=-1), target_size).numpy()
         img = dynamic_range_opt(img, epsilon=self.eps, mult_factor=self.mult_factor)
         
@@ -113,6 +114,54 @@ class CustomDataGen(tf.keras.utils.Sequence):
     
     def __len__(self):
         return int(np.ceil(self.n / self.batch_size))
+
+
+### --------------------- TF DATASET VERSION --------------------- ###
+class CustomDataTF:
+    def __init__(
+            self,
+            meta_data: pd.DataFrame,
+            target_size: tuple[int, int],
+            X_col="id",
+            y_col="mass",
+            epsilon=1e-6,
+            mult_factor=2.5
+            ):
+        self.meta_data = meta_data.copy()
+        self.target_size = target_size
+        self.data_dir = "/leonardo_scratch/fast/uTS25_Fontana/ALL_ROT_npy_version/1024x1024/"
+        self.X_col = X_col;     self.y_col = y_col
+        self.eps = epsilon;     self.mult_factor = mult_factor
+
+    def __len__(self):
+        return len(self.meta_data)
+
+    def _load_example(self, img_id, mass):
+        file_name = tf.strings.join([self.data_dir, img_id, ".npy"])
+        img = tf.numpy_function(np.load, [file_name], tf.float32)
+        img = tf.reshape(img, [1024, 1024])
+        img = img[362:662, 332:662]
+        img = tf.expand_dims(img, axis=-1)
+        img = tf.image.resize(img, self.target_size)
+
+        img = dynamic_range_opt(img, epsilon=self.eps, mult_factor=self.mult_factor)
+        label = tf.math.pow(tf.constant(10.0, dtype=tf.float64), (mass - 13.8))
+        return img, label
+
+    def get_dataset(
+            self, batch_size: int, shuffle: bool = True
+            ) -> tf.data.Dataset:
+        ids = self.meta_data[self.X_col].values
+        masses = self.meta_data[self.y_col].values
+
+        ds = tf.data.Dataset.from_tensor_slices((ids, masses))
+        if shuffle:
+            ds = ds.shuffle(buffer_size=len(self.meta_data))
+
+        ds = ds.map(lambda img_id, m: self._load_example(img_id, m),
+                    num_parallel_calls=tf.data.AUTOTUNE)
+        ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+        return ds
     
 if __name__ == "__main__":
     # Example usage
@@ -120,6 +169,7 @@ if __name__ == "__main__":
     print("Loaded meta data.")
     print(f"Maximum mass: {meta_data['mass'].max()} \t Minimum mass: {meta_data['mass'].min()}")
     data_gen = CustomDataGen(meta_data, batch_size=32, target_size=(128, 128))
+    print(f"Number of batches per epoch: {len(data_gen)}")
 
     for X, y in data_gen:
         print(f"Batch X shape: {X.shape}, Batch y shape: {y.shape}")

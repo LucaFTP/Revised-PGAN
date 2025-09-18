@@ -32,18 +32,17 @@ def scale_images(images, new_shape):
     
     return np.asarray(images_list)
 
-def dynamic_range_opt(array, epsilon=1e-6, mult_factor=1):
-    array = (array + epsilon)/epsilon
-    a = np.log10(array)
-    b = np.log10(1/epsilon)
-    return a/b * mult_factor
+def dynamic_range_opt(x, epsilon=1e-6, mult_factor=1.0):
+    x = (x + epsilon) / epsilon
+    a = tf.math.log(x) / tf.math.log(tf.constant(10.0, dtype=tf.float32))
+    b = tf.math.log(1.0/epsilon) / tf.math.log(tf.constant(10.0, dtype=tf.float32))
+    return (a / b) * mult_factor
 
-def inv_dynamic_range(synth_img, eps=1e-6, mult_factor=1):
-    # synth_img = tf.image.resize(synth_img, (128, 128))
-    image = synth_img[:]/mult_factor
-    a = - eps**(1 - image)
-    b = eps**image - 1
-    return a*b
+def inv_dynamic_range(image, eps=1e-6, mult_factor=1.0):
+    x = image / mult_factor
+    a = - tf.pow(eps, 1.0 - x)
+    b = tf.pow(eps, x) - 1.0
+    return a * b
 
 # calculate frechet inception distance
 def calculate_fid(fid_model, mu1, sigma1, images2):
