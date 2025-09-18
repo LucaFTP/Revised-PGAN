@@ -1,8 +1,9 @@
 import keras
 import numpy as np
+import tensorflow as tf
 
 from model import PGAN
-from data_utils import CustomDataGen
+from data_utils import CustomDataGen, CustomDataTF
 from gan_monitor import GANMonitor, FadeInLRSchedule
 
 class PGANTrainer:
@@ -10,13 +11,14 @@ class PGANTrainer:
             self,
             meta_data,
             config: dict,
-            pgan: PGAN,
+            pgan_config: dict,
             cbk: GANMonitor,
             loss_out_path: str,
+            version: str = None,
             **kwargs
             ):
-        
-        self.pgan = pgan;                   self.cbk = cbk
+
+        self.pgan_config = pgan_config;     self.cbk = cbk
         self.meta_data = meta_data;         self.config = config
         self.loss_out_path = loss_out_path; self.verbose = kwargs.get('verbose', 1)
 
@@ -29,7 +31,9 @@ class PGANTrainer:
 
         self.eps = config.get('epsilon', 1e-6);     self.mult_factor = config.get('mult_factor', 2.5)
 
-        self.milestone = kwargs.get('milestone', None)
+        self.version = version;                     self.milestone = kwargs.get('milestone', None)
+
+        self.strategy = tf.distribute.MirroredStrategy()
 
         self.ckpt_callback = keras.callbacks.ModelCheckpoint(
             filepath="pgan_best_mass_loss.weights.h5",
@@ -71,10 +75,16 @@ class PGANTrainer:
         self.pgan.compile(d_optimizer=self.d_optimizer, g_optimizer=self.g_optimizer, r_optimizer=self.r_optimizer)
 
     def _make_dataset(self, size, batch_size):
-        return CustomDataGen(
-            self.meta_data, batch_size=batch_size, target_size=(size, size),
-            shuffle=True, epsilon=self.eps, mult_factor=self.mult_factor
+        # return CustomDataGen(
+        #     self.meta_data, batch_size=batch_size, target_size=(size, size),
+        #     shuffle=True, epsilon=self.eps, mult_factor=self.mult_factor
+        # )
+        data_gen = CustomDataTF(
+            self.meta_data, target_size=(size, size),
+            epsilon=self.eps, mult_factor=self.mult_factor
         )
+        dataset = data_gen.get_dataset(batch_size=batch_size, shuffle=True)
+        return dataset
 
     def _fit_and_log(self, dataset, prefix, steps, epochs):
         self.cbk.set_prefix(prefix)
@@ -83,7 +93,7 @@ class PGANTrainer:
                                 callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
         # Save history and FID scores
         np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
-        if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.cbk.fid_scores)
+        # if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.cbk.fid_scores)
         return history
 
     def train(self):
@@ -91,56 +101,76 @@ class PGANTrainer:
         initial_depth = int(np.log2(self.start_size/2))
         current_size = self.start_size
 
-        if self.start_size == self.pgan.min_resolution:
-            self.pgan.n_depth = 0
+        with self.strategy.scope():
 
-        for n_depth in range(1, initial_depth):
-            self.pgan.n_depth = n_depth
-            self.pgan.fade_in_generator()
-            self.pgan.fade_in_discriminator()
-            if self.pgan.version is None: self.pgan.fade_in_regressor()
+            self.pgan = PGAN(pgan_config=self.pgan_config, version=self.version)
+                
+            if self.milestone is None:
+                if self.start_size == self.pgan.min_resolution:
+                    self.pgan.n_depth = 0
 
-            self.pgan.stabilize_generator()
-            self.pgan.stabilize_discriminator()
-            if self.pgan.version is None: self.pgan.stabilize_regressor()
-        
-        print(f"Starting training at {self.start_size}x{self.start_size}")
-        if self.milestone is not None:
-            print(f"Using milestone: {self.milestone}")
-            if self.end_size == self.start_size:
-                self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_init_{self.milestone}.weights.h5")
+                for n_depth in range(1, initial_depth):
+                    self.pgan.n_depth = n_depth
+                    self.pgan.fade_in_generator()
+                    self.pgan.fade_in_discriminator()
+                    if self.pgan.version is None: self.pgan.fade_in_regressor()
+
+                    self.pgan.stabilize_generator()
+                    self.pgan.stabilize_discriminator()
+                    if self.pgan.version is None: self.pgan.stabilize_regressor()
+                
+                print(f"Starting training at {self.start_size}x{self.start_size}")
+                self.init_optimizers()
+                dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
+                history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs)
+
+                if initial_depth == max_depth:
+                    return self.pgan
+
+                for n_depth in range(initial_depth, max_depth):
+                    current_size = current_size * 2
+                    print(f"\n>> Fading in at size {current_size}x{current_size}")
+                    self.pgan.n_depth = n_depth
+                    dataset = self._make_dataset(current_size, self.batch_sizes[n_depth - initial_depth])
+
+                    self.pgan.fade_in_generator()
+                    self.pgan.fade_in_discriminator()
+                    self.pgan.fade_in_regressor()
+                    self.init_optimizers(fade_in=True, steps=len(dataset))
+
+                    history_fade_in = self._fit_and_log(dataset, f'{n_depth}_fade_in', len(dataset), self.fade_in_epochs)
+
+                    print(f"\n>> Stabilizing at size {current_size}x{current_size}")
+                    self.pgan.stabilize_generator()
+                    self.pgan.stabilize_discriminator()
+                    self.pgan.stabilize_regressor()
+                    self.init_optimizers()
+
+                    history_stabilize = self._fit_and_log(dataset, f'{n_depth}_stabilize', len(dataset), self.epochs)
+            
             else:
+                ## With this current implementation, we can only restart from the final step
+                ## No progressive training from a middle step
+                print("---------------------")
+                print(f"Using milestone: {self.milestone}")
+                print("---------------------")
+                
+                for n_depth in range(1, max_depth):
+                    self.pgan.n_depth = n_depth
+                    self.pgan.fade_in_generator()
+                    self.pgan.fade_in_discriminator()
+                    if self.pgan.version is None: self.pgan.fade_in_regressor()
+
+                    self.pgan.stabilize_generator()
+                    self.pgan.stabilize_discriminator()
+                    if self.pgan.version is None: self.pgan.stabilize_regressor()
+
                 self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_final_{self.milestone}.weights.h5")
-        self.init_optimizers()
-        dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
-        history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs)
+                self.init_optimizers()
 
-        if initial_depth == max_depth:
-            return self.pgan
-
-        for n_depth in range(initial_depth, max_depth):
-            current_size = current_size * 2
-            print(f"\n>> Fading in at size {current_size}x{current_size}")
-            self.pgan.n_depth = n_depth
-            dataset = self._make_dataset(current_size, self.batch_sizes[n_depth - initial_depth])
-
-            self.pgan.fade_in_generator()
-            self.pgan.fade_in_discriminator()
-            self.pgan.fade_in_regressor()
-            self.init_optimizers(fade_in=True, steps=len(dataset))
-
-            history_fade_in = self._fit_and_log(dataset, f'{n_depth}_fade_in', len(dataset), self.fade_in_epochs)
-
-            print(f"\n>> Stabilizing at size {current_size}x{current_size}")
-            self.pgan.stabilize_generator()
-            self.pgan.stabilize_discriminator()
-            self.pgan.stabilize_regressor()
-            self.init_optimizers()
-
-            history_stabilize = self._fit_and_log(dataset, f'{n_depth}_stabilize', len(dataset), self.epochs)
 
         print(f"\n>> Final training at size {self.end_size}x{self.end_size}")
         dataset = self._make_dataset(self.end_size, self.batch_sizes[max_depth - initial_depth])
-        history_final_step = self._fit_and_log(dataset, f'{self.pgan.n_depth}_final', len(dataset), 2 * self.epochs)
+        history_final_step = self._fit_and_log(dataset, f'{self.pgan.n_depth}_final', len(dataset), self.epochs)
 
         return self.pgan

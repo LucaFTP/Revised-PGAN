@@ -6,11 +6,11 @@ test_*.ipynb
 
 # Config files and results
 results/
-config_file_dir/
 FID*
 *.h5
 *.txt
 *.npy
+*.json
 
 # Mainframe
 mainframe.csv
