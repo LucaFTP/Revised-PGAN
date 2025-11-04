@@ -36,12 +36,6 @@ def parse_arguments(parser: ArgumentParser) -> ArgumentParser:
         required=False,
         help="The model milestone to load. If None, the training will restart from the beginning."
     )
-    parser.add_argument(
-        "-r",
-        "--trained-regressor",
-        action="store_true",
-        help="If True, the regressor will be a pre-trained model. If False, the regressor will be trained."
-    )
     return parser
 
 @parser(
@@ -83,7 +77,6 @@ def main(command_line_args: ArgumentParser) -> None:
         meta_data=meta_data,
         config=train_config,
         pgan_config=model_config,
-        trained_reg=version if command_line_args.trained_regressor else None,
         cbk=cbk,
         loss_out_path=LOSS_OUTPUT_PATH,
         verbose=command_line_args.verbose,

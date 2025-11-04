@@ -1,5 +1,6 @@
 import keras
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 
 from model import PGAN
@@ -14,13 +15,12 @@ class PGANTrainer:
             pgan_config: dict,
             cbk: GANMonitor,
             loss_out_path: str,
-            version: str = None,
             **kwargs
             ):
 
-        self.pgan_config = pgan_config;     self.cbk = cbk
-        self.meta_data = meta_data;         self.config = config
-        self.loss_out_path = loss_out_path; self.verbose = kwargs.get('verbose', 1)
+        self.pgan_config = pgan_config;             self.cbk = cbk
+        self.meta_data = meta_data;                 self.config = config
+        self.loss_out_path = loss_out_path;         self.verbose = kwargs.get('verbose', 1)
 
         self.start_size  = config['start_size'];    self.end_size = config['end_size']
         self.batch_sizes = config['batch_size'];    self.epochs   = config['epochs']
@@ -31,7 +31,7 @@ class PGANTrainer:
 
         self.eps = config.get('epsilon', 1e-6);     self.mult_factor = config.get('mult_factor', 2.5)
 
-        self.version = version;                     self.milestone = kwargs.get('milestone', None)
+        self.milestone = kwargs.get('milestone', None)
 
         self.strategy = tf.distribute.MirroredStrategy()
 
@@ -92,7 +92,7 @@ class PGANTrainer:
         history = self.pgan.fit(dataset, epochs=epochs, initial_epoch=int(self.milestone) if self.milestone else 0,
                                 callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
         # Save history and FID scores
-        np.save(f'{self.loss_out_path}/history_{prefix}.npy', history.history)
+        pd.DataFrame(history.history).to_csv(f'{self.loss_out_path}/history_{prefix}.csv', index_label="epoch")
         # if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.cbk.fid_scores)
         return history
 
@@ -103,7 +103,7 @@ class PGANTrainer:
 
         with self.strategy.scope():
 
-            self.pgan = PGAN(pgan_config=self.pgan_config, version=self.version)
+            self.pgan = PGAN(pgan_config=self.pgan_config)
                 
             if self.milestone is None:
                 if self.start_size == self.pgan.min_resolution:
@@ -113,12 +113,12 @@ class PGANTrainer:
                     self.pgan.n_depth = n_depth
                     self.pgan.fade_in_generator()
                     self.pgan.fade_in_discriminator()
-                    if self.pgan.version is None: self.pgan.fade_in_regressor()
+                    self.pgan.fade_in_regressor()
 
                     self.pgan.stabilize_generator()
                     self.pgan.stabilize_discriminator()
-                    if self.pgan.version is None: self.pgan.stabilize_regressor()
-                
+                    self.pgan.stabilize_regressor()
+
                 print(f"Starting training at {self.start_size}x{self.start_size}")
                 self.init_optimizers()
                 dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
@@ -149,8 +149,8 @@ class PGANTrainer:
                     history_stabilize = self._fit_and_log(dataset, f'{n_depth}_stabilize', len(dataset), self.epochs)
             
             else:
-                ## With this current implementation, we can only restart from the final step
-                ## No progressive training from a middle step
+                ## With this current implementation, we can only restart from the final resolution step
+                ## No progressive training when loading from a milestone
                 print("---------------------")
                 print(f"Using milestone: {self.milestone}")
                 print("---------------------")
@@ -159,11 +159,11 @@ class PGANTrainer:
                     self.pgan.n_depth = n_depth
                     self.pgan.fade_in_generator()
                     self.pgan.fade_in_discriminator()
-                    if self.pgan.version is None: self.pgan.fade_in_regressor()
+                    self.pgan.fade_in_regressor()
 
                     self.pgan.stabilize_generator()
                     self.pgan.stabilize_discriminator()
-                    if self.pgan.version is None: self.pgan.stabilize_regressor()
+                    self.pgan.stabilize_regressor()
 
                 self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_final_{self.milestone}.weights.h5")
                 self.init_optimizers()

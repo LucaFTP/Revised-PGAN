@@ -7,7 +7,7 @@ from generic_utils import dynamic_range_opt
 
 def create_folders(version:str):
     
-    CKPT_OUTPUT_PATH = '/leonardo_scratch/fast/uTS25_Fontana/GAN_ckpts_' + version
+    CKPT_OUTPUT_PATH = '/leonardo_work/uTS25_Fontana/Gan_results_and_ckpts/GAN_ckpts_' + version
     IMG_OUTPUT_PATH  = 'results/results_' + version + '/Images'
     LOSS_OUTPUT_PATH = 'results/results_' + version + '/Loss'
 

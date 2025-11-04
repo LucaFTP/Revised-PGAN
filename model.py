@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from keras import Model, models
+from keras import Model
 
 from model_utils.blocks import(
     WeightScalingConv,
@@ -13,15 +13,9 @@ from model_utils.layers import(
 )
 
 class PGAN(Model):
-    def __init__(
-            self,
-            pgan_config: dict,
-            *,
-            version: str = None
-            ):
+    def __init__(self, pgan_config: dict):
         super(PGAN, self).__init__()
         
-        self.version = version
         self.latent_dim = pgan_config.get('latent_dim');        self.d_steps = pgan_config.get('d_steps')
         self.gp_weight  = pgan_config.get('gp_weight', 10);     self.drift_weight = pgan_config.get('drift_weight', 0.001)
         self.min_resolution = pgan_config.get('min_res', 4);    self.mass_loss_weight = pgan_config.get('mass_loss_weight', 1)
@@ -31,9 +25,14 @@ class PGAN(Model):
         self.regressor_filters = [50, 50, 50, 50, 20, 10, 10]
         self.regressor_filters_2 = [50, 50, 50, 20, 10, 10, 10]
         
-        self.discriminator = self.init_discriminator();         self.generator = self.init_generator()
-        regressor_ckpt_folder = "/leonardo/home/userexternal/lfontana/GAN/Revised-PGAN/results/regressor_results"
-        self.regressor = models.load_model(f"{regressor_ckpt_folder}/best_regressor_{version}.keras") if version else self.init_regressor()
+        self.discriminator = self.init_discriminator();     self.generator = self.init_generator();     self.regressor = self.init_regressor()
+
+        self.d_loss_tracker = tf.keras.metrics.Mean(name="d_loss");         self.g_loss_tracker = tf.keras.metrics.Mean(name="g_loss")
+        self.mass_loss_tracker = tf.keras.metrics.Mean(name="mass_loss");   self.r_loss_tracker = tf.keras.metrics.Mean(name="r_loss")
+
+    @property
+    def metrics(self):
+        return [self.d_loss_tracker, self.g_loss_tracker, self.mass_loss_tracker, self.r_loss_tracker]
 
     def call(self, inputs):
         return
@@ -303,19 +302,26 @@ class PGAN(Model):
         g_gradient = g_tape.gradient(g_loss , self.generator.trainable_weights)
         # Update the weights 
         self.g_optimizer.apply_gradients(zip(g_gradient, self.generator.trainable_weights))
-
-        if self.version:
-            return {'d_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss}
         
-        else:
-            with tf.GradientTape() as r_tape:
+        with tf.GradientTape() as r_tape:
 
-                # Train regressor
-                pred_mass = self.regressor(real_images, training=True)
+            # Train regressor
+            pred_mass = self.regressor(real_images, training=True)
 
-                # Loss on mass 
-                r_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, pred_mass)
+            r_loss = tf.keras.losses.MeanAbsoluteError()(real_mass, pred_mass)
 
-            r_gradient = r_tape.gradient(r_loss, self.regressor.trainable_weights) 
-            self.r_optimizer.apply_gradients(zip(r_gradient, self.regressor.trainable_weights))
-            return {'r_loss': r_loss, 'd_loss': d_loss, 'g_loss': g_loss, 'mass_loss': mass_loss}
+        r_gradient = r_tape.gradient(r_loss, self.regressor.trainable_weights) 
+        self.r_optimizer.apply_gradients(zip(r_gradient, self.regressor.trainable_weights))
+
+        self.d_loss_tracker.update_state(d_loss)
+        self.g_loss_tracker.update_state(g_loss)
+        self.r_loss_tracker.update_state(r_loss)
+        self.mass_loss_tracker.update_state(mass_loss)
+
+        logs = {
+            "d_loss": self.d_loss_tracker.result(),
+            "g_loss": self.g_loss_tracker.result(),
+            "mass_loss": self.mass_loss_tracker.result(),
+            "r_loss": self.r_loss_tracker.result()
+        }
+        return logs

@@ -1,3 +1,5 @@
+import re
+import os
 import numpy as np
 import tensorflow as tf
 from typing import Callable
@@ -107,3 +109,39 @@ def parser(
         return new_function
 
     return decorator
+
+def plot_loss(loss_path, start_size=4):
+
+    image_size = start_size
+    num_files = (len(os.listdir(loss_path)) + 1)
+    fig, ax = plt.subplots(num_files//2,2, figsize=(15,25))
+    ax = ax.flatten()
+    i = 0
+    s={}
+    color = ['b','g','r','y']
+    for file in os.listdir(loss_path):
+        name = re.split('_|\.',file)[-2]
+        iteration = re.split('_|\.',file)[1]
+        if name in ['init', 'stabilize']:
+            s[name + iteration] = np.load(loss_path+'/'+file,allow_pickle=True)
+    s = sorted(s.items())
+    for j in range(len(s)):
+        ax[i].plot(s[j][1].item()['d_loss'], '.-')
+        ax[i].plot(s[j][1].item()['g_loss'], '.-')
+
+        ax[i+1].plot(s[j][1].item()['r_loss'], '.-')
+
+        try:
+            image_size = 2*image_size
+            ax[i].set_title(f"Image Size: {image_size} x {image_size}")
+            ax[i+1].set_title(f"Image Size: {image_size} x {image_size}")
+        except:
+            ax[i].set_title(f"Image Size: {start_size} x {start_size}")
+            ax[i+1].set_title(f"Image Size: {start_size} x {start_size}")
+        ax[i].legend(['Discriminator Loss', 'Generator Loss'])
+        ax[i+1].legend(['Generated Mass Loss', 'Real Mass Loss'])
+
+        i = i + 2
+        
+    output_path = loss_path + "image.png"
+    plt.savefig(output_path, bbox_inches='tight')

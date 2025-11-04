@@ -9,33 +9,68 @@ from argparse import ArgumentParser
 from sklearn import metrics, model_selection
 
 from model import PGAN
-from train_regressor import build_regressor
 from data_utils import CustomDataGen, load_meta_data
 
 to_mass_range = lambda x: 10**(x - 13.8)
+
+def RegressorConv(
+        x: keras.layers.Layer,
+        filters: int,
+        kernel_size: int,
+        pooling: str = None,
+        activate: str = None,
+        strides: tuple = (1, 1)
+    ) -> keras.layers.Layer:
+
+    x = keras.layers.Conv2D(filters, kernel_size, strides=strides, use_bias=False, padding="same", dtype='float32')(x)
+    x = keras.layers.BatchNormalization()(x)
+    if activate == 'LeakyReLU':
+        x = keras.layers.LeakyReLU(0.01)(x)
+    if pooling == 'max':
+        x = keras.layers.MaxPooling2D(pool_size=2, strides=2)(x)
+    elif pooling == 'avg':
+        x = keras.layers.AveragePooling2D(pool_size=4, strides=1)(x)
+    return x
+
+def build_regressor(image_size: int, filters: list) -> keras.Model:
+    input_shape = (image_size, image_size, 1)
+    img_input = keras.layers.Input(shape=input_shape, name="reg_input")
+    x = img_input
+    
+    for depth in range(5):
+        x = RegressorConv(x, filters[depth], kernel_size=1, pooling=None,  activate='LeakyReLU', strides=(1,1))
+        x = RegressorConv(x, filters[depth], kernel_size=3, pooling='max', activate='LeakyReLU', strides=(1,1))
+
+    x = keras.layers.Flatten()(x)
+    x = keras.layers.Dense(units=16)(x)
+    x = keras.layers.LeakyReLU(0.01)(x)
+    x = keras.layers.Dense(units=1)(x)
+
+    return keras.Model(img_input, x, name='regressor')
 
 def compute_tstr_trst(
         train_config: dict, model: PGAN, meta_data: pd.DataFrame, num_imgs: int=2500, batch_size: int=64
     ) -> np.ndarray:
 
     random_latent_vectors = tf.random.normal(shape=[num_imgs, model.latent_dim])
-    random_mass = to_mass_range(np.round(tf.random.uniform([num_imgs, 1], minval=13.8, maxval=15.), 2))
+    # random_latent_vectors = tf.random.uniform(shape=[num_imgs, model.latent_dim], minval=-3.2, maxval=3.2)
+    random_mass = to_mass_range(np.round(tf.random.uniform([num_imgs, 1], minval=13.2, maxval=15.), 2))
 
     time_0 = timeit.default_timer()
     print(f"Generating {num_imgs} images with latent vectors and mass...")
     generated_imgs = model.generator.predict([random_latent_vectors, random_mass])  # num_images x end_size x end_size x 1
     print(f"Image generation completed in {timeit.default_timer() - time_0:.2f} seconds.")
-    
-    # random_mass = np.load("/leonardo/home/userexternal/lfontana/DIFFUSION/Conditioned/results/test_v1/masses-45.npy")
-    # generated_imgs = np.load("/leonardo/home/userexternal/lfontana/DIFFUSION/Conditioned/results/test_v1/images-45.npy")
+    # np.save(f"results/results_high_z/images-high_z_2490.npy", generated_imgs)
+    # random_mass = np.load("/leonardo/home/userexternal/lfontana/DIFFUSION/Conditional-Diffusion/results/class-free-5/masses-{version}.npy")
+    # generated_imgs = np.load("/leonardo/home/userexternal/lfontana/DIFFUSION/Conditional-Diffusion/results/class-free-5/images-{version}.npy")
 
-    x_train, x_val, y_train, y_val = model_selection.train_test_split(generated_imgs, random_mass, test_size=0.3)
+    x_train, x_val, y_train, y_val = model_selection.train_test_split(generated_imgs, random_mass, test_size=0.25)
 
     regressor_model = build_regressor(image_size=generated_imgs.shape[1], filters=[50, 50, 50, 20, 10])
     regressor_model.compile(keras.optimizers.Adam(learning_rate=5e-4), loss=keras.losses.MeanSquaredError())
 
     early_stop =  keras.callbacks.EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True)
-    history = regressor_model.fit(x_train, y_train, validation_data=(x_val,y_val), epochs=100, batch_size=batch_size, callbacks=[early_stop])
+    history = regressor_model.fit(x_train, y_train, validation_data=(x_val,y_val), epochs=200, batch_size=batch_size, callbacks=[early_stop])
     
     real_dataset = CustomDataGen(
         meta_data[meta_data['mass'] <= 15.], batch_size=batch_size, target_size=(train_config["end_size"],train_config["end_size"]),
@@ -75,7 +110,7 @@ def main():
         )
     args = parser.parse_args()
 
-    with open(f"config_file_dir/{args.config_file}", "r") as f:
+    with open(f"{args.config_file}", "r") as f:
         config = json.load(f)
     
     model_config = config["model_config"]
@@ -84,22 +119,24 @@ def main():
 
     meta_data = load_meta_data(train_config["z_th"], show=True)
 
-    model = PGAN(pgan_config=model_config, version=version)
+    model = PGAN(pgan_config=model_config)
     for n_depth in range(1, int(np.log2(train_config["end_size"]/2))):
         model.n_depth = n_depth
 
         model.fade_in_generator()
         model.fade_in_discriminator()
+        model.fade_in_regressor()
 
         model.stabilize_generator()
         model.stabilize_discriminator()
+        model.stabilize_regressor()
 
     best_epoch = args.best_epoch
     print(f"Loading weights from epoch {best_epoch} for version {version}...")
-    ckpt_path = f"/leonardo_scratch/fast/uTS25_Fontana/GAN_ckpts_{version}/pgan_5_init_{best_epoch}.weights.h5"
+    ckpt_path = f"/leonardo_work/uTS25_Fontana/Gan_results_and_ckpts/GAN_ckpts_{version}/pgan_5_final_{best_epoch}.weights.h5"
     model.load_weights(ckpt_path)
 
-    y_true, y_pred, r2_scores = compute_tstr_trst(train_config,model, meta_data, num_imgs=10000, batch_size=128)
+    y_true, y_pred, r2_scores = compute_tstr_trst(train_config,model, meta_data, num_imgs=2000, batch_size=128)
     print(f"Mean R2 score: {np.mean(r2_scores):.3f}")
     print(f"Standard deviation of R2 scores: {np.std(r2_scores):.3f}")
     np.save(f"results/results_{version}/r2_scores_{version}.npy", r2_scores)
