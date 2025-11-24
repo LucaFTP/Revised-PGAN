@@ -13,7 +13,7 @@ FID*
 *.json
 
 # Mainframe
-mainframe.csv
+*.csv
 
 # bash jobs
 *.sh

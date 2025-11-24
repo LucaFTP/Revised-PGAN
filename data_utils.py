@@ -37,10 +37,10 @@ def get_unique(data):
     for col in data.columns[1:]:
         print(f'\n"{col}" has {len(data[col].unique())} unique values: {data[col].unique()}')
 
-def load_meta_data(redshift, show=False):
-    meta_data = pd.read_csv("mainframe.csv")
+def load_meta_data(csv_file, redshift, show=False):
+    meta_data = pd.read_csv(csv_file)
     meta_data = meta_data[meta_data['redshift']<=redshift]
-    meta_data = meta_data[meta_data['redshift']>=0.2]
+    # meta_data = meta_data[meta_data['redshift']>=0.2]
 
     meta_data = meta_data[['id','redshift', 'mass', 'simulation', 'snap', 
                            'ax', 'rot']].drop_duplicates()
@@ -72,7 +72,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
         
         self.eps = kwargs.get('epsilon', 1e-6); self.mult_factor = kwargs.get('mult_factor', 2.5)
 
-        self.data_dir = "/leonardo_scratch/fast/uTS25_Fontana/ALL_ROT_npy_version/1024x1024/"
+        self.data_dir = "/leonardo_scratch/fast/uTS25_Fontana/redshift_zero_folder/"
 
     def on_epoch_end(self):
         if self.shuffle:
@@ -85,7 +85,7 @@ class CustomDataGen(tf.keras.utils.Sequence):
 
         img = np.load(file_name).astype('float32')
         # img = physical_units_zoom(img=img, mass=mass, side_length=3000)
-        img = img[362:662, 332:662]
+        # img = img[362:662, 332:662]
         img = tf.image.resize(np.expand_dims(img, axis=-1), target_size).numpy()
         img = dynamic_range_opt(img, epsilon=self.eps, mult_factor=self.mult_factor)
         
@@ -129,7 +129,7 @@ class CustomDataTF:
             ):
         self.meta_data = meta_data.copy()
         self.target_size = target_size
-        self.data_dir = "/leonardo_scratch/fast/uTS25_Fontana/ALL_ROT_npy_version/1024x1024/"
+        self.data_dir = "/leonardo_scratch/fast/uTS25_Fontana/redshift_zero_folder/"
         self.X_col = X_col;     self.y_col = y_col
         self.eps = epsilon;     self.mult_factor = mult_factor
 
@@ -140,7 +140,7 @@ class CustomDataTF:
         file_name = tf.strings.join([self.data_dir, img_id, ".npy"])
         img = tf.numpy_function(np.load, [file_name], tf.float32)
         img = tf.reshape(img, [1024, 1024])
-        img = img[362:662, 332:662]
+        # img = img[362:662, 332:662]
         img = tf.expand_dims(img, axis=-1)
         img = tf.image.resize(img, self.target_size)
 
@@ -168,7 +168,8 @@ if __name__ == "__main__":
     meta_data = load_meta_data(redshift=0.25, show=True)
     print("Loaded meta data.")
     print(f"Maximum mass: {meta_data['mass'].max()} \t Minimum mass: {meta_data['mass'].min()}")
-    data_gen = CustomDataGen(meta_data, batch_size=32, target_size=(128, 128))
+    # data_gen = CustomDataGen(meta_data, batch_size=32, target_size=(128, 128))
+    data_gen = CustomDataTF(meta_data, target_size=(128, 128), epsilon=5e-6).get_dataset(batch_size=32)
     print(f"Number of batches per epoch: {len(data_gen)}")
 
     for X, y in data_gen:

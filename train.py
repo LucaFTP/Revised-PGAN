@@ -35,8 +35,9 @@ class PGANTrainer:
 
         self.strategy = tf.distribute.MirroredStrategy()
 
+        best_regressor_ckpt = loss_out_path.split("Loss")[0] + "pgan_best_mass_loss.weights.h5"
         self.ckpt_callback = keras.callbacks.ModelCheckpoint(
-            filepath="pgan_best_mass_loss.weights.h5",
+            filepath=best_regressor_ckpt,
             monitor='mass_loss',
             mode='min',
             save_weights_only=True,
@@ -122,7 +123,7 @@ class PGANTrainer:
                 print(f"Starting training at {self.start_size}x{self.start_size}")
                 self.init_optimizers()
                 dataset = self._make_dataset(self.start_size, self.batch_sizes[0])
-                history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs)
+                history_init = self._fit_and_log(dataset, f'{self.pgan.n_depth}_init', len(dataset), self.epochs[n_depth - initial_depth + 1])
 
                 if initial_depth == max_depth:
                     return self.pgan
@@ -131,7 +132,7 @@ class PGANTrainer:
                     current_size = current_size * 2
                     print(f"\n>> Fading in at size {current_size}x{current_size}")
                     self.pgan.n_depth = n_depth
-                    dataset = self._make_dataset(current_size, self.batch_sizes[n_depth - initial_depth])
+                    dataset = self._make_dataset(current_size, self.batch_sizes[n_depth - initial_depth + 1])
 
                     self.pgan.fade_in_generator()
                     self.pgan.fade_in_discriminator()
@@ -146,7 +147,7 @@ class PGANTrainer:
                     self.pgan.stabilize_regressor()
                     self.init_optimizers()
 
-                    history_stabilize = self._fit_and_log(dataset, f'{n_depth}_stabilize', len(dataset), self.epochs)
+                    history_stabilize = self._fit_and_log(dataset, f'{n_depth}_stabilize', len(dataset), self.epochs[n_depth - initial_depth + 1])
             
             else:
                 ## With this current implementation, we can only restart from the final resolution step
@@ -170,7 +171,7 @@ class PGANTrainer:
 
 
         print(f"\n>> Final training at size {self.end_size}x{self.end_size}")
-        dataset = self._make_dataset(self.end_size, self.batch_sizes[max_depth - initial_depth])
-        history_final_step = self._fit_and_log(dataset, f'{self.pgan.n_depth}_final', len(dataset), self.epochs)
+        dataset = self._make_dataset(self.end_size, self.batch_sizes[-1])
+        history_final_step = self._fit_and_log(dataset, f'{self.pgan.n_depth}_final', len(dataset), self.epochs[-1])
 
         return self.pgan
