@@ -1,4 +1,7 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'    # Suppress TensorFlow logging
+os.environ["ABSL_LOG_LEVEL"] = "fatal"      # Suppress Abseil logging
+
 import json
 import matplotlib
 from argparse import ArgumentParser
@@ -56,7 +59,7 @@ def main(command_line_args: ArgumentParser) -> None:
     version = config_file.get('version')
     CKPT_OUTPUT_PATH, IMG_OUTPUT_PATH, LOSS_OUTPUT_PATH = create_folders(version=version)
 
-    meta_data = load_meta_data(train_config.get('z_th'), show=True)
+    meta_data = load_meta_data(train_config.get('meta_data_filepath'), train_config.get('z_th'), show=True)
     print(f"Data Shape: {meta_data.shape}")
 
     # Computing the Fid parameters associated with the real dataset
