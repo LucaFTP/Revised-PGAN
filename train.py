@@ -5,7 +5,9 @@ import tensorflow as tf
 
 from model import PGAN
 from data_utils import CustomDataGen, CustomDataTF
-from gan_monitor import GANMonitor, FadeInLRSchedule
+from gan_monitor import (
+    GANMonitor, FadeInLRSchedule, FirstBatchStderrFilter
+)
 
 class PGANTrainer:
     def __init__(
@@ -15,6 +17,8 @@ class PGANTrainer:
             pgan_config: dict,
             cbk: GANMonitor,
             loss_out_path: str,
+            *,
+            suppress_stderr = FirstBatchStderrFilter(),
             **kwargs
             ):
 
@@ -44,6 +48,7 @@ class PGANTrainer:
             save_best_only=True,
             verbose=1
         )
+        self.suppress_stderr = suppress_stderr
     
     def init_optimizers(self, fade_in=False, steps=None):
         if fade_in:
@@ -91,7 +96,7 @@ class PGANTrainer:
         self.cbk.set_prefix(prefix)
         self.cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
         history = self.pgan.fit(dataset, epochs=epochs, initial_epoch=int(self.milestone) if self.milestone else 0,
-                                callbacks=[self.cbk, self.ckpt_callback], verbose=self.verbose)
+                                callbacks=[self.cbk, self.ckpt_callback, self.suppress_stderr], verbose=self.verbose)
         # Save history and FID scores
         pd.DataFrame(history.history).to_csv(f'{self.loss_out_path}/history_{prefix}.csv', index_label="epoch")
         # if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.cbk.fid_scores)

@@ -1,6 +1,5 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'    # Suppress TensorFlow logging
-os.environ["ABSL_LOG_LEVEL"] = "fatal"      # Suppress Abseil logging
 
 import json
 import matplotlib

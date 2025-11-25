@@ -1,3 +1,5 @@
+import os, sys
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import backend as K # type: ignore
@@ -112,3 +114,20 @@ class FadeInLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
             "min_lr": self.min_lr,
             "fade_in_steps": self.fade_in_steps,
         }
+    
+class FirstBatchStderrFilter(tf.keras.callbacks.Callback):
+    '''
+    Suppress stderr output for the first training batch to remove the
+    tens of thousands gpu_timer warnings.
+    '''
+    def on_train_batch_begin(self, batch, logs=None):
+        if batch == 0:
+            self._orig_fd = os.dup(sys.stderr.fileno())
+            self._devnull = open('/dev/null', 'w')
+            os.dup2(self._devnull.fileno(), sys.stderr.fileno())
+
+    def on_train_batch_end(self, batch, logs=None):
+        if batch == 0:
+            os.dup2(self._orig_fd, sys.stderr.fileno())
+            os.close(self._orig_fd)
+            self._devnull.close()
