@@ -1,11 +1,16 @@
-import re
-import os
+from matplotlib import pyplot as plt
+
 import numpy as np
 import tensorflow as tf
 from typing import Callable
-from scipy.linalg import sqrtm
 from argparse import ArgumentParser
-from matplotlib import pyplot as plt
+
+import re
+import os
+import pandas as pd
+from collections import defaultdict
+
+from scipy.linalg import sqrtm
 from skimage.transform import resize
 from tensorflow.keras.applications.inception_v3 import preprocess_input # type: ignore
 
@@ -110,38 +115,94 @@ def parser(
 
     return decorator
 
+def merge_histories(H1, H2):
+    """Merge two metric dictionaries."""
+    result = defaultdict(list)
+    for key in H1.keys():
+        result[key].extend(H1[key])
+        result[key].extend(H2[key])
+    return dict(result)
+
+
+def load_history_file(path):
+    """Load .csv or .npy history file and return dictionary."""
+    if path.endswith(".csv"):
+        df = pd.read_csv(path)
+        return {col: df[col].tolist() for col in df.columns}
+    elif path.endswith(".npy"):
+        d = np.load(path, allow_pickle=True).item()
+        return d
+    else:
+        raise ValueError(f"Unsupported file format: {path}")
+
+
 def plot_loss(loss_path, start_size=4):
+    
+    files = sorted(os.listdir(loss_path))
+    valid = [f for f in files if "fade_in" not in f]
 
-    image_size = start_size
-    num_files = (len(os.listdir(loss_path)) + 1)
-    fig, ax = plt.subplots(num_files//2,2, figsize=(15,25))
-    ax = ax.flatten()
-    i = 0
-    s={}
-    color = ['b','g','r','y']
-    for file in os.listdir(loss_path):
-        name = re.split('_|\.',file)[-2]
-        iteration = re.split('_|\.',file)[1]
-        if name in ['init', 'stabilize']:
-            s[name + iteration] = np.load(loss_path+'/'+file,allow_pickle=True)
-    s = sorted(s.items())
-    for j in range(len(s)):
-        ax[i].plot(s[j][1].item()['d_loss'], '.-')
-        ax[i].plot(s[j][1].item()['g_loss'], '.-')
+    history_blocks = {}
 
-        ax[i+1].plot(s[j][1].item()['r_loss'], '.-')
+    pattern = re.compile(r"history_(\d+)_(init|stabilize|final)\.(csv|npy)")
 
-        try:
-            image_size = 2*image_size
-            ax[i].set_title(f"Image Size: {image_size} x {image_size}")
-            ax[i+1].set_title(f"Image Size: {image_size} x {image_size}")
-        except:
-            ax[i].set_title(f"Image Size: {start_size} x {start_size}")
-            ax[i+1].set_title(f"Image Size: {start_size} x {start_size}")
-        ax[i].legend(['Discriminator Loss', 'Generator Loss'])
-        ax[i+1].legend(['Generated Mass Loss', 'Real Mass Loss'])
+    for f in valid:
+        match = pattern.match(f)
+        if not match:
+            continue
+        depth, phase, _ = match.groups()
+        depth = int(depth)
 
-        i = i + 2
-        
-    output_path = loss_path + "image.png"
-    plt.savefig(output_path, bbox_inches='tight')
+        if depth not in history_blocks:
+            history_blocks[depth] = {}
+        history_blocks[depth][phase] = f
+
+    sorted_depths = sorted(history_blocks.keys())
+
+    n = len(sorted_depths)
+    fig, axes = plt.subplots(n, 2, figsize=(16, 5*n))
+    if n == 1:
+        axes = np.array([axes])\
+
+    current_size = start_size
+
+    for idx, depth in enumerate(sorted_depths):
+        phases = history_blocks[depth]
+
+        if "init" in phases:
+            history = load_history_file(os.path.join(loss_path, phases["init"]))
+        elif "stabilize" in phases:
+            history = load_history_file(os.path.join(loss_path, phases["stabilize"]))
+        else:
+            raise ValueError("No valid history file found for this depth.")
+
+        if "final" in phases:
+            H_final = load_history_file(os.path.join(loss_path, phases["final"]))
+            history = merge_histories(history, H_final)
+
+        # --- LEFT plot: d_loss & g_loss ---
+        ax1 = axes[idx][0]
+        ax1.plot(history["d_loss"], ".-", alpha=0.7)
+        ax1.plot(history["g_loss"], ".-", alpha=0.7)
+        ax1.set_title(f"Resolution: {current_size} × {current_size}", fontsize=12)
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Loss")
+        ax1.legend(["D Loss", "G Loss"])
+
+        # --- RIGHT plot: mass losses ---
+        ax2 = axes[idx][1]
+        ax2.plot(history["mass_loss"], ".-", alpha=0.7)
+        if "r_loss" in history:  # regressor loss presente
+            ax2.plot(history["r_loss"], ".-", alpha=0.7)
+            ax2.legend(["Mass Loss (gen)", "R Loss"])
+        else:
+            ax2.legend(["Mass Loss (gen)"])
+        ax2.set_title(f"Resolution: {current_size} × {current_size}", fontsize=12)
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("Loss")
+
+        current_size *= 2
+
+    plt.tight_layout()
+    out = os.path.join(loss_path, "loss_plots.png")
+    plt.savefig(out, dpi=150, bbox_inches="tight")
+    print(f"Saved plot to {out}")
