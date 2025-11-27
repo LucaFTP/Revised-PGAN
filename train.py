@@ -15,14 +15,14 @@ class PGANTrainer:
             meta_data,
             config: dict,
             pgan_config: dict,
-            cbk: GANMonitor,
+            monitor_cbk: GANMonitor,
             loss_out_path: str,
             *,
             suppress_stderr = FirstBatchStderrFilter(),
             **kwargs
             ):
 
-        self.pgan_config = pgan_config;             self.cbk = cbk
+        self.pgan_config = pgan_config;             self.monitor_cbk = monitor_cbk
         self.meta_data = meta_data;                 self.config = config
         self.loss_out_path = loss_out_path;         self.verbose = kwargs.get('verbose', 1)
 
@@ -40,7 +40,7 @@ class PGANTrainer:
         self.strategy = tf.distribute.MirroredStrategy()
 
         best_regressor_ckpt = loss_out_path.split("Loss")[0] + "pgan_best_mass_loss.weights.h5"
-        self.ckpt_callback = keras.callbacks.ModelCheckpoint(
+        ckpt_callback = keras.callbacks.ModelCheckpoint(
             filepath=best_regressor_ckpt,
             monitor='mass_loss',
             mode='min',
@@ -48,7 +48,15 @@ class PGANTrainer:
             save_best_only=True,
             verbose=1
         )
-        self.suppress_stderr = suppress_stderr
+        tensorboard_callback = keras.callbacks.TensorBoard(
+            log_dir=loss_out_path.split("Loss")[0] + "logs/",
+            update_freq='epoch',
+        )
+        suppress_stderr = suppress_stderr
+
+        self.callbacks = [
+            self.monitor_cbk, ckpt_callback, tensorboard_callback, suppress_stderr
+            ]
     
     def init_optimizers(self, fade_in=False, steps=None):
         if fade_in:
@@ -93,13 +101,17 @@ class PGANTrainer:
         return dataset
 
     def _fit_and_log(self, dataset, prefix, steps, epochs):
-        self.cbk.set_prefix(prefix)
-        self.cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
-        history = self.pgan.fit(dataset, epochs=epochs, initial_epoch=int(self.milestone) if self.milestone else 0,
-                                callbacks=[self.cbk, self.ckpt_callback, self.suppress_stderr], verbose=self.verbose)
+        self.monitor_cbk.set_prefix(prefix)
+        self.monitor_cbk.set_steps(steps_per_epoch=steps, epochs=epochs)
+        self.callbacks[2].log_dir = f'{self.loss_out_path.split("Loss")[0]}/logs/{prefix}/'
+        history = self.pgan.fit(
+            dataset, epochs=epochs,
+            initial_epoch=int(self.milestone) if self.milestone else 0,
+            callbacks=self.callbacks, verbose=self.verbose
+            )
         # Save history and FID scores
         pd.DataFrame(history.history).to_csv(f'{self.loss_out_path}/history_{prefix}.csv', index_label="epoch")
-        # if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.cbk.fid_scores)
+        # if "fade_in" not in prefix: np.save(f'{self.loss_out_path.split("Loss")[0]}/FID_{prefix}.npy', self.monitor_cbk.fid_scores)
         return history
 
     def train(self):
@@ -171,7 +183,7 @@ class PGANTrainer:
                     self.pgan.stabilize_discriminator()
                     self.pgan.stabilize_regressor()
 
-                self.pgan.load_weights(self.cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_final_{self.milestone}.weights.h5")
+                self.pgan.load_weights(self.monitor_cbk.checkpoint_dir + f"/pgan_{self.pgan.n_depth}_final_{self.milestone}.weights.h5")
                 self.init_optimizers()
 
 

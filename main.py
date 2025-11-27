@@ -79,7 +79,7 @@ def main(command_line_args: ArgumentParser) -> None:
         meta_data=meta_data,
         config=train_config,
         pgan_config=model_config,
-        cbk=cbk,
+        monitor_cbk=cbk,
         loss_out_path=LOSS_OUTPUT_PATH,
         verbose=command_line_args.verbose,
         milestone=command_line_args.model_milestone
